@@ -7,13 +7,7 @@ __email__ = "dsbatista@inesc-id.pt"
 import re
 from nltk import word_tokenize
 
-# regex for simple tags, e.g.:
-# <PER>Bill Gates</PER>
-regex_simple = re.compile('<[A-Z]+>[^<]+</[A-Z]+>', re.U)
-
-# regex for wikipedia linked tags e.g.:
-# <PER url=http://en.wikipedia.org/wiki/Mark_Zuckerberg>Mark Elliot Zuckerberg</PER>
-regex_linked = re.compile('<[A-Z]+ url=[^>]+>[^<]+</[A-Z]+>', re.U)
+regex_linked = re.compile('<[^>]+>', re.U)
 
 
 class Relationship:
@@ -67,13 +61,11 @@ class Relationship:
 
 
 class Sentence:
-
-    def __init__(self, _sentence, e1_type, e2_type, max_tokens, min_tokens, window_size):
+    def __init__(self, _sentence, e1_type, e2_type, max_tokens, min_tokens, window_size, stopwords):
         self.relationships = set()
         self.sentence = _sentence
         matches = []
 
-        #TODO: regex to used depends on Config.tags_type
         for m in re.finditer(regex_linked, self.sentence):
             matches.append(m)
 
@@ -98,42 +90,20 @@ class Sentence:
                 before = ' '.join(before)
                 after = ' '.join(after)
 
+                bet_words = word_tokenize(between)
+
+                if set(bet_words) <= set(stopwords):
+                    print "discarded"
+                    print "BET", bet_words
+
                 # only consider relationships where the distance between the two entities
                 # is less than 'max_tokens' and greater than 'min_tokens'
-                number_bet_tokens = len(word_tokenize(between))
-                if not number_bet_tokens > max_tokens and not number_bet_tokens < min_tokens:
-
-                    #TODO: run code according to Config.tags_type
-                    # simple tags
-                    """
-                    ent1 = matches[x].group()
-                    ent2 = matches[x + 1].group()
-                    arg1match = re.match("<[A-Z]+>", ent1)
-                    arg2match = re.match("<[A-Z]+>", ent2)
-                    ent1 = re.sub("</?[A-Z]+>", "", ent1, count=2, flags=0)
-                    ent2 = re.sub("</?[A-Z]+>", "", ent2, count=2, flags=0)
-                    arg1type = arg1match.group()[1:-1]
-                    arg2type = arg2match.group()[1:-1]
-                    """
-
+                elif not len(bet_words) > max_tokens and not len(bet_words) < min_tokens:
                     # linked tags
                     ent1 = re.findall('url=([^>]+)', matches[x].group())[0]
                     ent2 = re.findall('url=([^>]+)', matches[x+1].group())[0]
                     arg1type = re.findall('<([A-Z]+)', matches[x].group())[0]
                     arg2type = re.findall('<([A-Z]+)', matches[x+1].group())[0]
-
-                    #DEBUG
-                    """
-                    print _sentence
-                    print matches[x].group()
-                    print matches[x+1].group()
-                    print "BEF", before
-                    print "BET", between
-                    print "AFT", after
-                    print "ent1", ent1, arg1type
-                    print "ent2", ent2, arg2type
-                    print "==========================================\n"
-                    """
 
                     if ent1 == ent2:
                         continue
