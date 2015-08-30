@@ -19,7 +19,7 @@ from whoosh import query
 from nltk import word_tokenize, bigrams
 from nltk.corpus import stopwords
 from collections import defaultdict
-from Common.Sentence import Sentence
+from Common.SentenceEvalutionIndex import Sentence
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
@@ -345,11 +345,11 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         for r in g_dash_set:
             if r.ent1 in database.keys():
                 if r.ent2 in database[r.ent1]:
-                    g_intersect_d.append(r)
+                    g_intersect_d.add(r)
                 else:
-                    g_minus_d.append(r)
+                    g_minus_d.add(r)
             else:
-                g_minus_d.append(r)
+                g_minus_d.add(r)
 
         print "Extra filtering: from the intersection of G' with D, select only those based on keywords"
         print len(g_intersect_d)
@@ -562,8 +562,8 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     print multiprocessing.current_process(), "To Process", queue.qsize(), "Correct found:", len(results)
 
                 # if its not in the database calculate the PMI
-                entity1 = "<" + e1_type + ">" + r.ent1 + "</" + e1_type + ">"
-                entity2 = "<" + e2_type + ">" + r.ent2 + "</" + e2_type + ">"
+                entity1 = "<"+e1_type+" url="+r.ent1+">"
+                entity2 = "<"+e2_type+" url="+r.ent2+">"
                 t1 = query.Term('sentence', entity1)
                 t3 = query.Term('sentence', entity2)
 
@@ -573,13 +573,14 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
 
                 # Entities proximity considering relational words
                 # From the results above count how many contain a relational word
-                #print entity1, '\t', entity2, len(hits), "\n"
+                print entity1, '\t', entity2, len(hits), "\n"
                 hits_with_r = 0
                 hits_without_r = 0
                 fact_bet_words_tokens = word_tokenize(r.bet_words)
                 for s in hits:
                     sentence = s.get("sentence")
-                    s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW)
+                    s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW,
+                                 stopwords_list)
                     for s_r in s.relationships:
                         if r.ent1.decode("utf8") == s_r.ent1 and r.ent2.decode("utf8") == s_r.ent2:
                             unigrams_bef_words = word_tokenize(s_r.before)
@@ -587,11 +588,9 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                             unigrams_aft_words = word_tokenize(s_r.after)
                             bigrams_rel_words = extract_bigrams(s_r.between)
 
-                            """
-                            print "BEF", s_r.before, unigrams_bef_words
-                            print "BET", s_r.between,  unigrams_bet_words, bigrams_rel_words
-                            print "AFT", s_r.after, unigrams_aft_words
-                            """
+                            #print "BEF", s_r.before, unigrams_bef_words
+                            #print "BET", s_r.between,  unigrams_bet_words, bigrams_rel_words
+                            #print "AFT", s_r.after, unigrams_aft_words
 
                             if fact_bet_words_tokens == unigrams_bet_words:
                                 #print "****HIT**** 2"
@@ -619,7 +618,6 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     pmi = float(hits_with_r) / float(hits_without_r)
                     if pmi >= PMI:
                         results.append(r)
-                        """
                         print "**VALID**:", entity1, '\t', entity2
                         print "hits_without_r ", float(hits_without_r)
                         print "hits_with_r ", float(hits_with_r)
@@ -627,10 +625,8 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print r.sentence
                         print r.bet_words
                         print
-                        """
                     else:
                         not_found.append(r)
-                        """
                         print "**INVALID**:"
                         print 'ExtractedFact:', entity1, '\t', entity2
                         print r.sentence
@@ -645,7 +641,6 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print "PMI", pmi
                         print "Index hits", len(hits)
                         print
-                        """
                 else:
                     not_found.append(r)
                 count += 1
@@ -688,13 +683,10 @@ def main():
     print "System output relationships   :", len(system_output)
 
     # corpus from which the system extracted relationships
-    #corpus = "/home/dsbatista/gigaword/automatic-evaluation/corpus.txt"
-    corpus = "/home/dsbatista/gigaword/automatic-evaluation/sentences_matched_freebase_added_tags.txt"
+    corpus = "/home/dsbatista/gigaword/AFP-AIDA-Linked/all_sentences.txt"
 
     # index to be used to estimate proximity PMI
-    #index = "/home/dsbatista/gigaword/automatic-evaluation/index_2005_2010/"
-    # index = "/home/dsbatista/gigaword/automatic-evaluation/index_2000_2010/"
-    index = "/home/dsbatista/gigaword/automatic-evaluation/index_full"
+    index = "/home/dsbatista/gigaword/AFP-AIDA-Linked/index_full"
 
     # entities semantic type
     rel_words_unigrams = None
@@ -786,7 +778,7 @@ def main():
     print "Correct in corpus  :", len(a)
     print "Not found          :", len(not_found)
     print "\n"
-    assert len(d) > 0
+    #assert len(d) > 0
 
     uniq_d = set()
     for r in d:
@@ -801,7 +793,7 @@ def main():
     print "Relationships not found:", len(set(not_found))
 
     # Write relationships not found in the Database nor with high PMI relatation words to disk
-    f = open(rel_type + "_" + sys.argv[2][-11:][:-4] + "_negative.txt", "w")
+    f = open(rel_type + "_negative.txt", "w")
     for r in sorted(set(not_found), reverse=True):
         f.write('instance :' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
         f.write('sentence :' + r.sentence + '\n')
@@ -812,7 +804,7 @@ def main():
     f.close()
 
     # Write all correct relationships (sentence, entities and score) to file
-    f = open(rel_type + "_" + sys.argv[2][-11:][:-4] + "_positive.txt", "w")
+    f = open(rel_type + "_positive.txt", "w")
     for r in sorted(set(a).union(b), reverse=True):
         f.write('instance :' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
         f.write('sentence :' + r.sentence + '\n')
