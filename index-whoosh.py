@@ -43,11 +43,11 @@ def index_sentences(writer):
     f = codecs.open(sys.argv[1], "r", "utf-8")
     for line in f:
         try:
-            # remove string, keep the URL only, e.g.:
+            # remove entity surface string, keep the URL only, e.g.:
             # "...said authorities in <LOC url=http://en.wikipedia.org/wiki/United_Kingdom>London</LOC> must be held..."
             # becomes
             # "...said authorities in <LOC url=http://en.wikipedia.org/wiki/United_Kingdom> must be held to account..."
-            line = re.sub(r'\w+</[A-Z]+>', "", line)
+            line = re.sub(r'>([^<]+</[A-Z]+>)', ">", line)
             writer.add_document(sentence=line.strip())
         except UnicodeDecodeError, e:
             print e
