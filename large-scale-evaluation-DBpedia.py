@@ -823,7 +823,8 @@ def main():
     print "\nCalculating set C: database facts in the corpus but not extracted by the system"
     c, g_minus_d = calculate_c(corpus, database, b, e1_type, e2_type, rel_type,
                                rel_words_unigrams, rel_words_bigrams)
-    assert len(c) > 0
+    #TODO: ver este assert
+    #assert len(c) > 0
 
     uniq_c = set()
     for r in c:
@@ -839,6 +840,8 @@ def main():
     print "Correct in corpus  :", len(a)
     print "Not found          :", len(not_found)
     print "\n"
+
+    #TODO: ver este assert
     #assert len(d) > 0
 
     uniq_d = set()
