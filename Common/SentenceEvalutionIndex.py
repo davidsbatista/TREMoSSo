@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import sys
 
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
@@ -86,11 +87,10 @@ class Sentence:
 
                 # select 'window_size' tokens from left and right context
                 before = word_tokenize(before)[-window_size:]
+                bet_words = word_tokenize(between)
                 after = word_tokenize(after)[:window_size]
                 before = ' '.join(before)
                 after = ' '.join(after)
-
-                bet_words = word_tokenize(between)
 
                 if set(bet_words) <= set(stopwords):
                     continue
@@ -99,10 +99,17 @@ class Sentence:
                 # is less than 'max_tokens' and greater than 'min_tokens'
                 elif not len(bet_words) > max_tokens and not len(bet_words) < min_tokens:
                     # linked tags
-                    ent1 = re.findall('url=([^>]+)', matches[x].group())[0]
-                    ent2 = re.findall('url=([^>]+)', matches[x+1].group())[0]
-                    arg1type = re.findall('<([A-Z]+)', matches[x].group())[0]
-                    arg2type = re.findall('<([A-Z]+)', matches[x+1].group())[0]
+                    try:
+                        ent1 = re.findall('url=([^>]+)', matches[x].group())[0]
+                        ent2 = re.findall('url=([^>]+)', matches[x+1].group())[0]
+                        arg1type = re.findall('<([A-Z]+)', matches[x].group())[0]
+                        arg2type = re.findall('<([A-Z]+)', matches[x+1].group())[0]
+                    except IndexError, e:
+                        print _sentence
+                        print "ent1", matches[x].group()
+                        print "ent2", matches[x+1].group()
+                        ent2 = re.findall('url=([^>]+)', matches[x+1].group())[0]
+                        sys.exit(0)
 
                     if ent1 == ent2:
                         continue

@@ -4,6 +4,8 @@
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
 
+import codecs
+import re
 import fileinput
 import functools
 import multiprocessing
@@ -122,7 +124,8 @@ def process_corpus(queue, g_dash, e1_type, e2_type):
             if count % 25000 == 0:
                 print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total added: ", added
             line = queue.get_nowait()
-            s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW)
+            line = re.sub(r'>([^<]+</[A-Z]+>)', ">", line)
+            s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords_list)
             for r in s.relationships:
                 tokens = word_tokenize(r.between)
                 if all(x in not_valid for x in word_tokenize(r.between)):
@@ -220,6 +223,7 @@ def calculate_a(not_in_database, e1_type, e2_type, index, rel_words_unigrams, re
     m = multiprocessing.Manager()
     queue = m.Queue()
     num_cpus = multiprocessing.cpu_count()
+    #num_cpus = 1
     results = [m.list() for _ in range(num_cpus)]
     not_found = [m.list() for _ in range(num_cpus)]
 
@@ -288,7 +292,7 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
 
     # else generate G' and G minus D
     else:
-        with open(corpus) as f:
+        with codecs.open(corpus, 'r', 'utf8') as f:
             data = f.readlines()
             count = 0
             print "Storing in shared Queue"
@@ -700,11 +704,45 @@ def main():
 
     """
     affiliation                           & PER & ORG
+        <http://dbpedia.org/ontology/affiliation>
+
+
     founded-by                            & ORG & PER
-    installations-in                      & ORG & LOC  (location, headquarter)
-    has-shares-of                         & ORG & ORG  <http://dbpedia.org/ontology/subsidiary>
-    located-in                            & LOC & LOC  (isParfOf, country, locatedInArea)
-    study-at                              & PER & ORG  (almaMater)
+        <http://dbpedia.org/ontology/founder>
+
+    installations-in                      & ORG & LOC
+        <http://dbpedia.org/ontology/location>
+        <http://dbpedia.org/ontology/headquarter>
+        <http://dbpedia.org/ontology/locationCity>
+        <http://dbpedia.org/ontology/locationCountry>)
+
+    has-shares-of                         & ORG & ORG
+        <http://dbpedia.org/ontology/subsidiary>
+
+    located-in                            & LOC & LOC
+        <http://dbpedia.org/ontology/locatedInArea>
+        <http://dbpedia.org/ontology/archipelago>
+        <http://dbpedia.org/ontology/location>
+        <http://dbpedia.org/ontology/municipality>
+        <http://dbpedia.org/ontology/subregion>
+        <http://dbpedia.org/ontology/federalState>
+        <http://dbpedia.org/ontology/district>
+        <http://dbpedia.org/ontology/region>
+        <http://dbpedia.org/ontology/province>
+        <http://dbpedia.org/ontology/state>
+        <http://dbpedia.org/ontology/county>
+        <http://dbpedia.org/ontology/map>
+        <http://dbpedia.org/ontology/campus>
+        <http://dbpedia.org/ontology/garrison>
+        <http://dbpedia.org/ontology/department>
+        <http://dbpedia.org/ontology/country>
+        <http://dbpedia.org/ontology/capitalCountry>
+        <http://dbpedia.org/ontology/city>
+        <http://dbpedia.org/ontology/capital>
+        <http://dbpedia.org/ontology/largestCity>
+
+    study-at                              & PER & ORG
+        <http://dbpedia.org/ontology/almaMater>
 
     agrees-with                           & PER & PER
     disagrees-with                        & PER & PER
@@ -717,21 +755,38 @@ def main():
         rel_words_bigrams = installations_in_bigrams
         ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/has-installations-in.txt"
 
-    elif rel_type == 'acquired':
+    elif rel_type == 'studied':
+        e1_type = "ORG"
+        e2_type = "PER"
+        rel_words_unigrams = acquired_unigrams
+        rel_words_bigrams = acquired_unigrams
+        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/studied.txt"
+
+    elif rel_type == 'founder':
+        e1_type = "ORG"
+        e2_type = "PER"
+        rel_words_unigrams = acquired_unigrams
+        rel_words_bigrams = acquired_unigrams
+        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/founder.txt"
+
+    elif rel_type == 'has-shares-of':
         e1_type = "ORG"
         e2_type = "ORG"
         rel_words_unigrams = acquired_unigrams
         rel_words_bigrams = acquired_unigrams
+        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/has-shares-of.txt"
 
-    elif rel_type == 'contained_by':
+    elif rel_type == 'part-of':
         e1_type = "LOC"
         e2_type = "LOC"
+        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/located-in.txt"
 
     elif rel_type == 'affiliation':
         e1_type = "ORG"
         e2_type = "PER"
         rel_words_unigrams = employment_unigrams
         rel_words_bigrams = employment_bigrams
+        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/affiliation.txt"
 
     else:
         print "Invalid relationship type", rel_type
