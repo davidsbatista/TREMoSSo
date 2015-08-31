@@ -93,8 +93,7 @@ class Sentence:
                 bet_words = word_tokenize(between)
 
                 if set(bet_words) <= set(stopwords):
-                    print "discarded"
-                    print "BET", bet_words
+                    continue
 
                 # only consider relationships where the distance between the two entities
                 # is less than 'max_tokens' and greater than 'min_tokens'
@@ -121,27 +120,3 @@ class Sentence:
                         rel = Relationship(_sentence, before, between, after, ent1, ent2, arg1type, arg2type,
                                            _type=None)
                         self.relationships.add(rel)
-
-
-class SentenceParser:
-
-    def __init__(self, _sentence, e1_type, e2_type):
-        self.relationships = set()
-        self.sentence = _sentence
-        self.entities = list()
-        self.valid = False
-        self.tree = None
-        self.deps = None
-
-        for m in re.finditer(regex, self.sentence):
-            self.entities.append(m.group())
-
-        for e1 in self.entities:
-            for e2 in self.entities:
-                if e1 == e2:
-                    continue
-                arg1match = re.match("<([A-Z]+)>", e1)
-                arg2match = re.match("<([A-Z]+)>", e2)
-                if arg1match.group(1) == e1_type and arg2match.group(1) == e2_type:
-                    self.valid = True
-                    break;

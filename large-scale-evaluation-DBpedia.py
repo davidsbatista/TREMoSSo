@@ -573,7 +573,9 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
 
                 # Entities proximity considering relational words
                 # From the results above count how many contain a relational word
-                print entity1, '\t', entity2, len(hits), "\n"
+
+                #print entity1, '\t', entity2, len(hits), "\n"
+
                 hits_with_r = 0
                 hits_without_r = 0
                 fact_bet_words_tokens = word_tokenize(r.bet_words)
@@ -618,6 +620,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     pmi = float(hits_with_r) / float(hits_without_r)
                     if pmi >= PMI:
                         results.append(r)
+                        """
                         print "**VALID**:", entity1, '\t', entity2
                         print "hits_without_r ", float(hits_without_r)
                         print "hits_with_r ", float(hits_with_r)
@@ -625,8 +628,10 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print r.sentence
                         print r.bet_words
                         print
+                        """
                     else:
                         not_found.append(r)
+                        """
                         print "**INVALID**:"
                         print 'ExtractedFact:', entity1, '\t', entity2
                         print r.sentence
@@ -641,6 +646,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print "PMI", pmi
                         print "Index hits", len(hits)
                         print
+                        """
                 else:
                     not_found.append(r)
                 count += 1
