@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys
 
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
 
+import sys
 import re
 from nltk import word_tokenize
 
