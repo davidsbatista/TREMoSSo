@@ -21,7 +21,7 @@ from whoosh import query
 from nltk import word_tokenize, bigrams
 from nltk.corpus import stopwords
 from collections import defaultdict
-from Common.SentenceEvalutionIndex import Sentence
+from Sentence import Sentence
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
