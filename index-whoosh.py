@@ -51,7 +51,7 @@ def index_sentences(writer):
             writer.add_document(sentence=line.strip())
         except UnicodeDecodeError, e:
             print e
-            print l
+            print line
             sys.exit(0)
 
         count += 1
