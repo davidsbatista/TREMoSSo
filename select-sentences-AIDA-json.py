@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import cPickle
-import os
-
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
 
+import cPickle
+import os
 import re
 import codecs
 import sys
@@ -45,9 +44,11 @@ def load_sentences(directory, dbpedia_entities):
     ookbe_regex = re.compile(r'\[\[AIDA:--OOKBE--\|([^\]]+)\]\]')
     f_other = open("other_types.txt", "w")
     f_sentences = open("sentences.txt", "w")
+    print "Processing sentences"
     for f in files:
-        if count % 100 == 0:
+        if count % 1000 == 0:
             sys.stdout.write(".")
+            sys.stdout.flush()
         if f.endswith('.json'):
             #print join(directory, f)
             with open(join(directory, f)) as data_file:
@@ -129,6 +130,7 @@ def load_sentences(directory, dbpedia_entities):
                         f_sentences.write(sentence_no_ookbe.encode("utf8")+'\n')
         count += 1
     f_other.close()
+    print
 
 
 def main():
