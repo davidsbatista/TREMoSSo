@@ -21,7 +21,11 @@ from whoosh import query
 from nltk import word_tokenize, bigrams
 from nltk.corpus import stopwords
 from collections import defaultdict
-from Sentence import Sentence
+from Sentence2 import Sentence
+
+#num_cpus = multiprocessing.cpu_count()
+m = multiprocessing.Manager()
+num_cpus = 1
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
@@ -220,10 +224,7 @@ def extract_bigrams(text):
 # ########################################
 @timecall
 def calculate_a(not_in_database, e1_type, e2_type, index, rel_words_unigrams, rel_words_bigrams):
-    m = multiprocessing.Manager()
     queue = m.Queue()
-    num_cpus = multiprocessing.cpu_count()
-    #num_cpus = 1
     results = [m.list() for _ in range(num_cpus)]
     not_found = [m.list() for _ in range(num_cpus)]
 
@@ -275,10 +276,8 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
     # G' = superset of G, cartesian product of all possible entities and relations (i.e., G' = E x R x E)
     # for now, all relationships from a sentence
     print "Building G', a superset of G"
-    m = multiprocessing.Manager()
     queue = m.Queue()
     g_dash = m.list()
-    num_cpus = multiprocessing.cpu_count()
 
     # check if superset G' for e1_type, e2_type already exists and
     # if G' minus KB for rel_type exists
@@ -436,7 +435,6 @@ def calculate_d(g_minus_d, a, e1_type, e2_type, index, rel_type, rel_words_unigr
     else:
         m = multiprocessing.Manager()
         queue = m.Queue()
-        num_cpus = multiprocessing.cpu_count()
         results = [m.list() for _ in range(num_cpus)]
 
         for r in g_minus_d:
@@ -577,48 +575,57 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
 
                 # Entities proximity considering relational words
                 # From the results above count how many contain a relational word
-
                 #print entity1, '\t', entity2, len(hits), "\n"
 
                 hits_with_r = 0
                 hits_without_r = 0
                 fact_bet_words_tokens = word_tokenize(r.bet_words)
+
                 for s in hits:
                     sentence = s.get("sentence")
-                    s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW,
-                                 stopwords_list)
-                    for s_r in s.relationships:
-                        if r.ent1.decode("utf8") == s_r.ent1 and r.ent2.decode("utf8") == s_r.ent2:
-                            unigrams_bef_words = word_tokenize(s_r.before)
-                            unigrams_bet_words = word_tokenize(s_r.between)
-                            unigrams_aft_words = word_tokenize(s_r.after)
-                            bigrams_rel_words = extract_bigrams(s_r.between)
+                    start_e1 = sentence.rindex(entity1)
+                    end_e1 = start_e1+len(entity1)
+                    start_e2 = sentence.rindex(entity2)
+                    end_e2 = start_e2+len(entity2)
+                    bef = sentence[:start_e1]
+                    aft = sentence[end_e2:]
+                    bet = sentence[end_e1:start_e2]
+                    bef_tokens = word_tokenize(bef)
+                    bet_tokens = word_tokenize(bet)
+                    aft_tokens = word_tokenize(aft)
 
-                            #print "BEF", s_r.before, unigrams_bef_words
-                            #print "BET", s_r.between,  unigrams_bet_words, bigrams_rel_words
-                            #print "AFT", s_r.after, unigrams_aft_words
+                    if not (MIN_TOKENS_AWAY >= len(bet_tokens) <= MAX_TOKENS_AWAY):
+                        continue
+                    else:
+                        bef_tokens = bef_tokens[CONTEXT_WINDOW:]
+                        aft_tokens = aft_tokens[:CONTEXT_WINDOW]
 
-                            if fact_bet_words_tokens == unigrams_bet_words:
-                                #print "****HIT**** 2"
-                                hits_with_r += 1
+                    unigrams_bef_words = bef_tokens
+                    unigrams_bet_words = bet_tokens
+                    unigrams_aft_words = aft_tokens
+                    bigrams_rel_words = extract_bigrams(bet)
 
-                            elif any(x in rel_words_unigrams for x in unigrams_bef_words):
-                                #print "****HIT**** 4"
-                                hits_with_r += 1
+                    if fact_bet_words_tokens == unigrams_bet_words:
+                        #print "****HIT**** 2"
+                        hits_with_r += 1
 
-                            elif any(x in rel_words_unigrams for x in unigrams_bet_words):
-                                #print "****HIT**** 5"
-                                hits_with_r += 1
+                    elif any(x in rel_words_unigrams for x in unigrams_bef_words):
+                        #print "****HIT**** 4"
+                        hits_with_r += 1
 
-                            elif any(x in rel_words_unigrams for x in unigrams_aft_words):
-                                #print "****HIT**** 6"
-                                hits_with_r += 1
+                    elif any(x in rel_words_unigrams for x in unigrams_bet_words):
+                        #print "****HIT**** 5"
+                        hits_with_r += 1
 
-                            elif rel_words_bigrams == bigrams_rel_words:
-                                #print "****HIT**** 7"
-                                hits_with_r += 1
-                            else:
-                                hits_without_r += 1
+                    elif any(x in rel_words_unigrams for x in unigrams_aft_words):
+                        #print "****HIT**** 6"
+                        hits_with_r += 1
+
+                    elif rel_words_bigrams == bigrams_rel_words:
+                        #print "****HIT**** 7"
+                        hits_with_r += 1
+                    else:
+                        hits_without_r += 1
 
                 if hits_with_r > 0 and hits_without_r > 0:
                     pmi = float(hits_with_r) / float(hits_without_r)
@@ -635,6 +642,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         """
                     else:
                         not_found.append(r)
+                        #TODO: confirmar os invalids
                         """
                         print "**INVALID**:"
                         print 'ExtractedFact:', entity1, '\t', entity2
@@ -693,10 +701,10 @@ def main():
     print "System output relationships   :", len(system_output)
 
     # corpus from which the system extracted relationships
-    corpus = "/home/dsbatista/gigaword/AFP-AIDA-Linked/all_sentences.txt"
+    corpus = "/home/dsbatista/gigaword/AFP-AIDA-Linked/all_sentences_6_months.txt"
 
     # index to be used to estimate proximity PMI
-    index = "/home/dsbatista/gigaword/AFP-AIDA-Linked/index_full"
+    index = "/home/dsbatista/gigaword/AFP-AIDA-Linked/evaluation/index_full"
 
     # entities semantic type
     rel_words_unigrams = None
@@ -748,45 +756,47 @@ def main():
     disagrees-with                        & PER & PER
     """
 
+    base_dir = "/home/dsbatista/gigaword/AFP-AIDA-Linked/evaluation/ground-truth/"
+
     if rel_type == 'installations-in':
         e1_type = "ORG"
         e2_type = "LOC"
         rel_words_unigrams = installations_in_unigrams
         rel_words_bigrams = installations_in_bigrams
-        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/has-installations-in.txt"
+        ground_truth = base_dir+"has-installations-in.txt"
 
     elif rel_type == 'studied':
         e1_type = "ORG"
         e2_type = "PER"
         rel_words_unigrams = acquired_unigrams
         rel_words_bigrams = acquired_unigrams
-        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/studied.txt"
+        ground_truth = base_dir+"studied.txt"
 
     elif rel_type == 'founder':
         e1_type = "ORG"
         e2_type = "PER"
         rel_words_unigrams = acquired_unigrams
         rel_words_bigrams = acquired_unigrams
-        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/founder.txt"
+        ground_truth = base_dir+"founder.txt"
 
     elif rel_type == 'has-shares-of':
         e1_type = "ORG"
         e2_type = "ORG"
         rel_words_unigrams = acquired_unigrams
         rel_words_bigrams = acquired_unigrams
-        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/has-shares-of.txt"
+        ground_truth = base_dir+"has-shares-of.txt"
 
     elif rel_type == 'part-of':
         e1_type = "LOC"
         e2_type = "LOC"
-        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/located-in.txt"
+        ground_truth = base_dir+"located-in.txt"
 
     elif rel_type == 'affiliation':
         e1_type = "ORG"
         e2_type = "PER"
         rel_words_unigrams = employment_unigrams
         rel_words_bigrams = employment_bigrams
-        ground_truth = "/home/dsbatista/gigaword/AFP-AIDA-Linked/ground-truth/affiliation.txt"
+        ground_truth = base_dir+"affiliation.txt"
 
     else:
         print "Invalid relationship type", rel_type
