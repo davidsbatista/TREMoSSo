@@ -24,7 +24,6 @@ from collections import defaultdict
 from Sentence import Sentence
 
 num_cpus = multiprocessing.cpu_count()
-#num_cpus = 1
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
@@ -44,6 +43,10 @@ installations_in_bigrams = ['based in', 'located in', 'main office', ' main offi
 #TODO: melhorar esta lista, incluir mais profissões?
 employment_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer']
 employment_bigrams = []
+
+studied_unigrams = ['graduated', 'earned', 'degree']
+studied_bigrams = ['graduated from', 'earned phd']
+
 
 # tokens between entities which do net represent relationships
 bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
@@ -853,8 +856,8 @@ def main():
     elif rel_type == 'studied':
         e1_type = "ORG"
         e2_type = "PER"
-        rel_words_unigrams = None
-        rel_words_bigrams = None
+        rel_words_unigrams = studied_unigrams
+        rel_words_bigrams = studied_bigrams
         dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
         yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
 
