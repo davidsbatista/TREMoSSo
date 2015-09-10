@@ -23,8 +23,8 @@ from nltk.corpus import stopwords
 from collections import defaultdict
 from Sentence2 import Sentence
 
-#num_cpus = multiprocessing.cpu_count()
-num_cpus = 1
+num_cpus = multiprocessing.cpu_count()
+#num_cpus = 1
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
@@ -45,10 +45,7 @@ installations_in_bigrams = ['based in', 'located in', 'main office', ' main offi
 employment_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer']
 employment_bigrams = []
 
-relatioship_mappings = defaultdict(list)
-relatioship_mappings['installations-in'] = ['<http://dbpedia.org/ontology/location>, '
-                                            '<http://dbpedia.org/ontology/headquarter>']
-
+# tokens between entities which do net represent relationships
 bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
 stopwords = stopwords.words('english')
 not_valid = bad_tokens + stopwords
@@ -130,6 +127,17 @@ def process_corpus(queue, g_dash, e1_type, e2_type):
             line = re.sub(r'>([^<]+</[A-Z]+>)', ">", line)
             s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords)
             for r in s.relationships:
+                """
+                print r.sentence
+                print r.before
+                print r.between
+                print r.after
+                print r.ent1
+                print r.ent2
+                print r.arg1type
+                print r.arg2type
+                """
+
                 tokens = word_tokenize(r.between)
                 if all(x in not_valid for x in word_tokenize(r.between)):
                     continue
@@ -178,7 +186,7 @@ def process_output(data, threshold, rel_type):
                 bef = ''
             if 'aft' not in locals():
                 aft = ''
-            if passive_voice is True and rel_type in ['acquired', 'headquarters']:
+            if passive_voice is True and rel_type in ['acquired', 'installations-in']:
                 r = ExtractedFact(e2, e1, float(score), bef, bet, aft, sentence, passive_voice)
             else:
                 r = ExtractedFact(e1, e2, float(score), bef, bet, aft, sentence, passive_voice)
@@ -191,10 +199,8 @@ def process_output(data, threshold, rel_type):
     return system_output
 
 
-def process_dbpedia(data):
+def process_dbpedia(data, database, file_rel_type):
     # Load relationships from DBpedia and store in a hashtable
-    database = defaultdict(list)
-
     for line in fileinput.input(data):
         try:
             e1, rel, e2, p = line.strip().split('>')
@@ -205,12 +211,34 @@ def process_dbpedia(data):
             print "Error parsing", line
             sys.exit(0)
 
-        # store in a dictionary per relationship: dict['ent1'] = 'ent2'
-        database[e1.strip()].append(e2.strip())
-
+        # follow the order of the relationships as in the output
+        if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt']:
+            database[e2.strip().decode("utf8")].append(e1.strip().decode("utf8"))
+        else:
+            database[e1.strip().decode("utf8")].append(e2.strip().decode("utf8"))
     fileinput.close()
 
-    return database
+
+def process_yago(data, database, rel_type):
+    for line in fileinput.input(data):
+        try:
+            e1, rel, e2 = line.strip().split('\t')
+            e1 = e1.replace("<", "").replace(">", "")
+            e2 = e2.replace("<", "").replace(">", "").strip().replace(".", "")
+        except ValueError:
+            print "Error parsing", line
+            sys.exit(0)
+
+        # to have the same URL links has from the output and DBpedia
+        e1 = "http://en.wikipedia.org/wiki/"+e1
+        e2 = "http://en.wikipedia.org/wiki/"+e2
+
+        # follow the order of the relationships as in the output
+        if rel_type in ['founder', 'affiliation']:
+            database[e2.strip().decode("utf8")].append(e1.strip().decode("utf8"))
+        else:
+            database[e1.strip().decode("utf8")].append(e2.strip().decode("utf8"))
+    fileinput.close()
 
 
 def extract_bigrams(text):
@@ -713,45 +741,59 @@ def main():
 
     """
     affiliation                           & PER & ORG
-        <http://dbpedia.org/ontology/affiliation>
+        DBpedia:        <http://dbpedia.org/ontology/affiliation>
+        YagoFacts.ttl:  <isAffiliatedTo>
 
 
     founded-by                            & ORG & PER
-        <http://dbpedia.org/ontology/founder>
+        DBpedia:        <http://dbpedia.org/ontology/founder>
+        YagoFacts.ttl:  <created>
+
 
     installations-in                      & ORG & LOC
-        <http://dbpedia.org/ontology/location>
-        <http://dbpedia.org/ontology/headquarter>
-        <http://dbpedia.org/ontology/locationCity>
-        <http://dbpedia.org/ontology/locationCountry>)
+        DBpedia:        <http://dbpedia.org/ontology/location>
+                        <http://dbpedia.org/ontology/headquarter>
+                        <http://dbpedia.org/ontology/locationCity>
+                        <http://dbpedia.org/ontology/locationCountry>
+
+                        testar com esta: <http://dbpedia.org/ontology/locatedInArea> ?
+
+        YagoFacts.ttl:  <isLocatedIn>
 
     has-shares-of                         & ORG & ORG
-        <http://dbpedia.org/ontology/subsidiary>
+        DBpedia:        <http://dbpedia.org/ontology/subsidiary>
+        YagoFacts.ttl:  <owns>
 
     located-in                            & LOC & LOC
-        <http://dbpedia.org/ontology/locatedInArea>
-        <http://dbpedia.org/ontology/archipelago>
-        <http://dbpedia.org/ontology/location>
-        <http://dbpedia.org/ontology/municipality>
-        <http://dbpedia.org/ontology/subregion>
-        <http://dbpedia.org/ontology/federalState>
-        <http://dbpedia.org/ontology/district>
-        <http://dbpedia.org/ontology/region>
-        <http://dbpedia.org/ontology/province>
-        <http://dbpedia.org/ontology/state>
-        <http://dbpedia.org/ontology/county>
-        <http://dbpedia.org/ontology/map>
-        <http://dbpedia.org/ontology/campus>
-        <http://dbpedia.org/ontology/garrison>
-        <http://dbpedia.org/ontology/department>
-        <http://dbpedia.org/ontology/country>
-        <http://dbpedia.org/ontology/capitalCountry>
-        <http://dbpedia.org/ontology/city>
-        <http://dbpedia.org/ontology/capital>
-        <http://dbpedia.org/ontology/largestCity>
+        DBpedia:        <http://dbpedia.org/ontology/locatedInArea> # has organisations and locations
+                        <http://dbpedia.org/ontology/country>
+                        <http://dbpedia.org/ontology/capital>       # swap
+                        <http://dbpedia.org/ontology/largestCity>   # swap
+
+                        #TODO:
+                        <http://dbpedia.org/ontology/municipality>
+                        <http://dbpedia.org/ontology/archipelago>
+                        <http://dbpedia.org/ontology/subregion>
+                        <http://dbpedia.org/ontology/federalState>
+                        <http://dbpedia.org/ontology/district>
+                        <http://dbpedia.org/ontology/region>
+                        <http://dbpedia.org/ontology/province>
+                        <http://dbpedia.org/ontology/state>
+                        <http://dbpedia.org/ontology/county>
+                        <http://dbpedia.org/ontology/map>
+                        <http://dbpedia.org/ontology/campus>
+                        <http://dbpedia.org/ontology/garrison>
+                        <http://dbpedia.org/ontology/department>
+
+                        #<http://dbpedia.org/ontology/capitalCountry>
+                        #<http://dbpedia.org/ontology/city>
+                        #<http://dbpedia.org/ontology/location>
+
+        YagoFacts.ttl:  <isLocatedIn>
 
     study-at                              & PER & ORG
-        <http://dbpedia.org/ontology/almaMater>
+        DBpedia:         <http://dbpedia.org/ontology/almaMater>
+        YagoFacts.ttl:   <graduatedFrom>
 
     agrees-with                           & PER & PER
     disagrees-with                        & PER & PER
@@ -764,41 +806,47 @@ def main():
         e2_type = "LOC"
         rel_words_unigrams = installations_in_unigrams
         rel_words_bigrams = installations_in_bigrams
-        ground_truth = base_dir+"has-installations-in.txt"
+        dbpedia_ground_truth = [base_dir+"dbpedia_location.txt", base_dir+"dbpedia_headquarter.txt",
+                                base_dir+"dbpedia_locationCity.txt", base_dir+"dbpedia_locationCountry.txt"]
+        yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
 
     elif rel_type == 'studied':
         e1_type = "ORG"
         e2_type = "PER"
         rel_words_unigrams = acquired_unigrams
         rel_words_bigrams = acquired_unigrams
-        ground_truth = base_dir+"studied.txt"
+        dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
+        yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
 
     elif rel_type == 'founder':
         e1_type = "ORG"
         e2_type = "PER"
         rel_words_unigrams = acquired_unigrams
         rel_words_bigrams = acquired_unigrams
-        ground_truth = base_dir+"founder.txt"
+        dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
+        yago_ground_truth = [base_dir+"yago_created.txt"]
 
     elif rel_type == 'has-shares-of':
         e1_type = "ORG"
         e2_type = "ORG"
         rel_words_unigrams = acquired_unigrams
         rel_words_bigrams = acquired_unigrams
-        ground_truth = base_dir+"has-shares-of.txt"
+        dbpedia_ground_truth = [base_dir+"dbpedia_subsidiary.txt"]
+        yago_ground_truth = [base_dir+"yago_owns.txt"]
 
-    elif rel_type == 'part-of':
+    elif rel_type == 'located-in':
         e1_type = "LOC"
         e2_type = "LOC"
-        ground_truth = base_dir+"located-in.txt"
+        dbpedia_ground_truth = [base_dir+"dbpedia_locatedInArea.txt"]
+        yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
 
     elif rel_type == 'affiliation':
         e1_type = "ORG"
         e2_type = "PER"
         rel_words_unigrams = employment_unigrams
         rel_words_bigrams = employment_bigrams
-        ground_truth = base_dir+"affiliation.txt"
-
+        dbpedia_ground_truth = [base_dir+"dbpedia_affiliation.txt"]
+        yago_ground_truth = [base_dir+"yago_affiliation.txt", base_dir+"yago_worksAt.txt"]
     else:
         print "Invalid relationship type", rel_type
         sys.exit(0)
@@ -807,9 +855,20 @@ def main():
     print "Arg1 Type:", e1_type
     print "Arg2 Type:", e2_type
 
-    # load freebase relationships as the database
-    print "Loading relationships from DBpedia"
-    database = process_dbpedia(ground_truth)
+    # load relationships into database
+    database = defaultdict(list)
+    print "\nLoading relationships from DBpedia"
+    for f in dbpedia_ground_truth:
+        print f.split('/')[-1],
+        process_dbpedia(dbpedia_ground_truth, database, f.split('/')[-1])
+        print
+
+    print "\nLoading relationships from Yago"
+    for f in yago_ground_truth:
+        print f.split('/')[-1],
+        process_yago(f, database, rel_type)
+
+    print len(database)
 
     print "\nCalculating set B: intersection between system output and database"
     b, not_in_database = calculate_b(system_output, database)
