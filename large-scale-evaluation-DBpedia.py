@@ -40,12 +40,15 @@ installations_in_bigrams = ['based in', 'located in', 'main office', ' main offi
                             'office in', 'branch in', 'store in', 'firm in', 'factory in', 'plant in', 'head office',
                             'head offices', 'in central', 'in downton', 'outskirts of', 'suburs of']
 
-#TODO: melhorar esta lista, incluir mais profissões?
+#TODO: mais palavras
 employment_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer']
 employment_bigrams = []
 
 studied_unigrams = ['graduated', 'earned', 'degree']
 studied_bigrams = ['graduated from', 'earned phd']
+
+located_in_unigrams = None
+located_in_bigrams = None
 
 
 # tokens between entities which do net represent relationships
@@ -117,41 +120,6 @@ def timecall(f):
         return result
 
     return wrapper
-
-
-def process_corpus(queue, g_dash, e1_type, e2_type):
-    count = 0
-    added = 0
-    while True:
-        try:
-            if count % 25000 == 0:
-                print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total added: ", added
-            line = queue.get_nowait()
-            line = re.sub(r'>([^<]+</[A-Z]+>)', ">", line)
-            s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords)
-            for r in s.relationships:
-                """
-                print r.sentence
-                print r.before
-                print r.between
-                print r.after
-                print r.ent1
-                print r.ent2
-                print r.arg1type
-                print r.arg2type
-                """
-
-                tokens = word_tokenize(r.between)
-                if all(x in not_valid for x in word_tokenize(r.between)):
-                    continue
-                elif "," in tokens and tokens[0] != ',':
-                    continue
-                else:
-                    g_dash.append(r)
-                    added += 1
-            count += 1
-        except Queue.Empty:
-            break
 
 
 def process_output(data, threshold, rel_type):
@@ -728,9 +696,13 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
 
 
 def find_intersection(results, no_matches, database, queue):
+    count = 0
     while True:
         try:
+            if count % 25000 == 0:
+                print multiprocessing.current_process(), "In Queue", queue.qsize()
             r = queue.get_nowait()
+            count += 1
             if r.ent1 in database.keys():
                 if r.ent2 in database[r.ent1]:
                     results.append(r)
@@ -739,6 +711,41 @@ def find_intersection(results, no_matches, database, queue):
             else:
                 no_matches.append(r)
 
+        except Queue.Empty:
+            break
+
+
+def process_corpus(queue, g_dash, e1_type, e2_type):
+    count = 0
+    added = 0
+    while True:
+        try:
+            if count % 25000 == 0:
+                print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total added: ", added
+            line = queue.get_nowait()
+            line = re.sub(r'>([^<]+</[A-Z]+>)', ">", line)
+            s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords)
+            for r in s.relationships:
+                """
+                print r.sentence
+                print r.before
+                print r.between
+                print r.after
+                print r.ent1
+                print r.ent2
+                print r.arg1type
+                print r.arg2type
+                """
+
+                tokens = word_tokenize(r.between)
+                if all(x in not_valid for x in word_tokenize(r.between)):
+                    continue
+                elif "," in tokens and tokens[0] != ',':
+                    continue
+                else:
+                    g_dash.append(r)
+                    added += 1
+            count += 1
         except Queue.Empty:
             break
 
@@ -869,7 +876,7 @@ def main():
         dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
         yago_ground_truth = [base_dir+"yago_created.txt"]
 
-    elif rel_type == 'has-shares-of':
+    elif rel_type == 'has-shares':
         e1_type = "ORG"
         e2_type = "ORG"
         rel_words_unigrams = acquired_unigrams
@@ -880,8 +887,8 @@ def main():
     elif rel_type == 'located-in':
         e1_type = "LOC"
         e2_type = "LOC"
-        rel_words_unigrams = None
-        rel_words_bigrams = None
+        rel_words_unigrams = located_in_unigrams
+        rel_words_bigrams = located_in_bigrams
         dbpedia_ground_truth = [base_dir+"dbpedia_locatedInArea.txt"]
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
 
