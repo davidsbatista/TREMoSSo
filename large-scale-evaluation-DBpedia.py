@@ -28,8 +28,8 @@ num_cpus = multiprocessing.cpu_count()
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
-founded_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofounded', 'founded', 'founders']
-founded_bigrams = ['started by']
+founder_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofounded', 'founded', 'founders']
+founder_bigrams = ['started by']
 
 acquired_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
 acquired_bigrams = []
@@ -423,19 +423,36 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         # Facts not in the database, to use in estimating set d
         g_minus_d = set()
 
-        #TODO: paralelizar
+        queue = manager.Queue()
+        results = [manager.list() for _ in range(num_cpus)]
+        no_matches = [manager.list() for _ in range(num_cpus)]
+
+        # Load everything into a shared queue
         for r in g_dash_set:
-            if r.ent1 in database.keys():
-                if r.ent2 in database[r.ent1]:
-                    g_intersect_d.add(r)
-                else:
-                    g_minus_d.add(r)
-            else:
-                g_minus_d.add(r)
+            queue.put(r)
+
+        processes = [multiprocessing.Process(target=find_intersection, args=(results[i], no_matches[i], database,
+                                                                             queue))
+                     for i in range(num_cpus)]
+
+        for proc in processes:
+            proc.start()
+
+        for proc in processes:
+            proc.join()
+
+        for result in results:
+            for e in result:
+                g_intersect_d.add(e)
+
+        for no_match in no_matches:
+            for e in no_match:
+                g_minus_d.add(e)
 
         print "Extra filtering: from the intersection of G' with D, select only those based on keywords"
-        print len(g_intersect_d)
+        print "G intersection with D", len(g_intersect_d)
         filtered = set()
+
         for r in g_intersect_d:
             unigrams_bet = word_tokenize(r.between)
             unigrams_bef = word_tokenize(r.before)
@@ -557,74 +574,73 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
         while True:
             try:
                 r = queue.get_nowait()
+                """
                 if count % 50 == 0:
-                    print "\n", multiprocessing.current_process(), "In Queue", queue.qsize(), \
-                        "Total Matched: ", len(results)
-                if (r.ent1, r.ent2) not in all_in_database:
-                    # if its not in the database calculate the PMI
-                    entity1 = "<" + e1_type + ">" + r.ent1 + "</" + e1_type + ">"
-                    entity2 = "<" + e2_type + ">" + r.ent2 + "</" + e2_type + ">"
-                    t1 = query.Term('sentence', entity1)
-                    t3 = query.Term('sentence', entity2)
+                    print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total Matched: ", len(results)
+                """
 
-                    # Entities proximity query without relational words
-                    q1 = spans.SpanNear2([t1, t3], slop=distance, ordered=True, mindist=1)
-                    hits = searcher.search(q1, limit=q_limit)
+                t1 = query.Term('sentence', "<"+e1_type+" url="+r.ent1+">")
+                t3 = query.Term('sentence', "<"+e2_type+" url="+r.ent2+">")
 
-                    # Entities proximity considering relational words
-                    # From the results above count how many contain a relational word
-                    #print entity1, '\t', entity2, len(hits), "\n"
-                    hits_with_r = 0
-                    hits_without_r = 0
-                    for s in hits:
-                        sentence = s.get("sentence")
-                        s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW,
-                                     stopwords)
-                        for s_r in s.relationships:
-                            if r.ent1.decode("utf8") == s_r.ent1 and r.ent2.decode("utf8") == s_r.ent2:
-                                unigrams_rel_words = word_tokenize(s_r.between)
-                                bigrams_rel_words = extract_bigrams(s_r.between)
-                                if all(x in not_valid for x in unigrams_rel_words):
-                                    hits_without_r += 1
-                                    continue
-                                elif any(x in rel_words_unigrams for x in unigrams_rel_words):
-                                    """
-                                    print "UNIGRAMS HIT"
-                                    print s_r.sentence
-                                    print s_r.ent1
-                                    print s_r.ent2
-                                    print s_r.between
-                                    print "\n"
-                                    """
-                                    hits_with_r += 1
-                                elif any(x in rel_words_bigrams for x in bigrams_rel_words):
-                                    """
-                                    print "BIGRAMS HIT"
-                                    print s_r.sentence
-                                    print s_r.ent1
-                                    print s_r.ent2
-                                    print s_r.between
-                                    print "\n"
-                                    """
-                                    hits_with_r += 1
-                                else:
-                                    hits_without_r += 1
+                # Entities proximity query without relational words
+                q1 = spans.SpanNear2([t1, t3], slop=distance, ordered=True, mindist=1)
+                hits = searcher.search(q1, limit=q_limit)
 
-                    if hits_with_r > 0 and hits_without_r > 0:
-                        pmi = float(hits_with_r) / float(hits_without_r)
-                        if pmi >= PMI:
-                            if word_tokenize(s_r.between)[-1] == 'by':
-                                tmp = s_r.ent2
-                                s_r.ent2 = s_r.ent1
-                                s_r.ent1 = tmp
-                            results.append(r)
-                            """
-                            print "**ADDED**:", entity1, '\t', entity2
-                            print "hits_without_r ", float(hits_without_r)
-                            print "hits_with_r ", float(hits_with_r)
-                            print "PMI", pmi
-                            print
-                            """
+                # Entities proximity considering relational words
+                # From the results above count how many contain a relational word
+
+                hits_with_r = 0
+                hits_without_r = 0
+
+                for s in hits:
+                    sentence = s.get("sentence")
+                    s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW,
+                                 stopwords)
+                    for s_r in s.relationships:
+                        if r.ent1.decode("utf8") == s_r.ent1 and r.ent2.decode("utf8") == s_r.ent2:
+                            unigrams_rel_words = word_tokenize(s_r.between)
+                            bigrams_rel_words = extract_bigrams(s_r.between)
+                            if all(x in not_valid for x in unigrams_rel_words):
+                                hits_without_r += 1
+                                continue
+                            elif any(x in rel_words_unigrams for x in unigrams_rel_words):
+                                """
+                                print "UNIGRAMS HIT"
+                                print s_r.sentence
+                                print s_r.ent1
+                                print s_r.ent2
+                                print s_r.between
+                                print "\n"
+                                """
+                                hits_with_r += 1
+                            elif any(x in rel_words_bigrams for x in bigrams_rel_words):
+                                """
+                                print "BIGRAMS HIT"
+                                print s_r.sentence
+                                print s_r.ent1
+                                print s_r.ent2
+                                print s_r.between
+                                print "\n"
+                                """
+                                hits_with_r += 1
+                            else:
+                                hits_without_r += 1
+
+                if hits_with_r > 0 and hits_without_r > 0:
+                    pmi = float(hits_with_r) / float(hits_without_r)
+                    if pmi >= PMI:
+                        if word_tokenize(s_r.between)[-1] == 'by':
+                            tmp = s_r.ent2
+                            s_r.ent2 = s_r.ent1
+                            s_r.ent1 = tmp
+                        results.append(r)
+                        """
+                        print "**ADDED**:", entity1, '\t', entity2
+                        print "hits_without_r ", float(hits_without_r)
+                        print "hits_with_r ", float(hits_with_r)
+                        print "PMI", pmi
+                        print
+                        """
                 count += 1
             except Queue.Empty:
                 break
@@ -785,10 +801,6 @@ def main():
     # index to be used to estimate proximity PMI
     index = "/home/dsbatista/gigaword/AFP-AIDA-Linked/evaluation/index_full"
 
-    # entities semantic type
-    rel_words_unigrams = None
-    rel_words_bigrams = None
-
     """
     affiliation                           & PER & ORG
         DBpedia:        <http://dbpedia.org/ontology/affiliation>
@@ -863,16 +875,16 @@ def main():
     elif rel_type == 'studied':
         e1_type = "ORG"
         e2_type = "PER"
-        rel_words_unigrams = acquired_unigrams
-        rel_words_bigrams = acquired_unigrams
+        rel_words_unigrams = None
+        rel_words_bigrams = None
         dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
         yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
 
     elif rel_type == 'founder':
         e1_type = "ORG"
         e2_type = "PER"
-        rel_words_unigrams = acquired_unigrams
-        rel_words_bigrams = acquired_unigrams
+        rel_words_unigrams = founder_unigrams
+        rel_words_bigrams = founder_unigrams
         dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
         yago_ground_truth = [base_dir+"yago_created.txt"]
 
@@ -887,6 +899,8 @@ def main():
     elif rel_type == 'located-in':
         e1_type = "LOC"
         e2_type = "LOC"
+        rel_words_unigrams = None
+        rel_words_bigrams = None
         dbpedia_ground_truth = [base_dir+"dbpedia_locatedInArea.txt"]
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
 
@@ -917,11 +931,12 @@ def main():
     for f in yago_ground_truth:
         print f.split('/')[-1],
         process_yago(f, database, rel_type)
+        print
 
-    print len(database)
+    print
+    print len(database), "relationships loaded"
 
     print "\nCalculating set B: intersection between system output and database"
-    #b, not_in_database = calculate_b(system_output, database)
     b, not_in_database = calculate_b_parallel(system_output, database)
 
     print "System output      :", len(system_output)
