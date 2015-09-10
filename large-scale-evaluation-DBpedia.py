@@ -21,7 +21,7 @@ from whoosh import query
 from nltk import word_tokenize, bigrams
 from nltk.corpus import stopwords
 from collections import defaultdict
-from Sentence2 import Sentence
+from Sentence import Sentence
 
 num_cpus = multiprocessing.cpu_count()
 #num_cpus = 1
@@ -200,7 +200,6 @@ def process_output(data, threshold, rel_type):
 
 
 def process_dbpedia(data, database, file_rel_type):
-    # Load relationships from DBpedia and store in a hashtable
     for line in fileinput.input(data):
         try:
             e1, rel, e2, p = line.strip().split('>')
@@ -284,6 +283,7 @@ def calculate_b(output, database):
     # it is assumed that every fact in this region is correct
     b = list()
     not_found = list()
+    #TODO: paralelizar
     for r in output:
         if r.ent1 in database.keys():
             if r.ent2 in database[r.ent1]:
@@ -292,6 +292,55 @@ def calculate_b(output, database):
                 not_found.append(r)
         else:
             not_found.append(r)
+
+    return b, not_found
+
+
+def find_intersection(results, no_matches, database, queue):
+    while True:
+        try:
+            r = queue.get_nowait()
+            if r.ent1 in database.keys():
+                if r.ent2 in database[r.ent1]:
+                    results.append(r)
+                else:
+                    no_matches.append(r)
+            else:
+                no_matches.append(r)
+
+        except Queue.Empty:
+            break
+
+
+def calculate_b_parallel(output, database):
+    # intersection between the system output and the database
+    # it is assumed that every fact in this region is correct
+    m = multiprocessing.Manager()
+    queue = m.Queue()
+    results = [m.list() for _ in range(num_cpus)]
+    no_matches = [m.list() for _ in range(num_cpus)]
+    b = list()
+    not_found = list()
+
+    for r in output:
+        queue.put(r)
+
+    processes = [multiprocessing.Process(target=find_intersection, args=(results[i], no_matches[i], database, queue))
+                 for i in range(num_cpus)]
+
+    for proc in processes:
+        proc.start()
+
+    for proc in processes:
+        proc.join()
+
+    for result in results:
+        for e in result:
+            b.append(e)
+
+    for no_match in no_matches:
+        for e in no_match:
+            not_found.append(e)
 
     return b, not_found
 
@@ -374,6 +423,7 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         # Facts not in the database, to use in estimating set d
         g_minus_d = set()
 
+        #TODO: paralelizar
         for r in g_dash_set:
             if r.ent1 in database.keys():
                 if r.ent2 in database[r.ent1]:
@@ -730,7 +780,7 @@ def main():
     print "System output relationships   :", len(system_output)
 
     # corpus from which the system extracted relationships
-    corpus = "/home/dsbatista/gigaword/AFP-AIDA-Linked/all_sentences_6_months.txt"
+    corpus = "/home/dsbatista/gigaword/AFP-AIDA-Linked/documents/all_sentences_6_months.txt"
 
     # index to be used to estimate proximity PMI
     index = "/home/dsbatista/gigaword/AFP-AIDA-Linked/evaluation/index_full"
@@ -871,7 +921,8 @@ def main():
     print len(database)
 
     print "\nCalculating set B: intersection between system output and database"
-    b, not_in_database = calculate_b(system_output, database)
+    #b, not_in_database = calculate_b(system_output, database)
+    b, not_in_database = calculate_b_parallel(system_output, database)
 
     print "System output      :", len(system_output)
     print "Found in database  :", len(b)
@@ -893,8 +944,7 @@ def main():
     print "\nCalculating set C: database facts in the corpus but not extracted by the system"
     c, g_minus_d = calculate_c(corpus, database, b, e1_type, e2_type, rel_type,
                                rel_words_unigrams, rel_words_bigrams)
-    #TODO: ver este assert
-    #assert len(c) > 0
+    assert len(c) > 0
 
     uniq_c = set()
     for r in c:
@@ -911,8 +961,7 @@ def main():
     print "Not found          :", len(not_found)
     print "\n"
 
-    #TODO: ver este assert
-    #assert len(d) > 0
+    assert len(d) > 0
 
     uniq_d = set()
     for r in d:
