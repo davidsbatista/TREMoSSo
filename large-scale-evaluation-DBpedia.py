@@ -248,7 +248,6 @@ def extract_bigrams(text):
 # ########################################
 # Estimations of sets and intersections #
 # ########################################
-@timecall
 def calculate_a(not_in_database, e1_type, e2_type, index, rel_words_unigrams, rel_words_bigrams):
     m = multiprocessing.Manager()
     queue = m.Queue()
@@ -275,41 +274,6 @@ def calculate_a(not_in_database, e1_type, e2_type, index, rel_words_unigrams, re
         wrong.extend(l)
 
     return a, wrong
-
-
-@timecall
-def calculate_b(output, database):
-    # intersection between the system output and the database
-    # it is assumed that every fact in this region is correct
-    b = list()
-    not_found = list()
-    #TODO: paralelizar
-    for r in output:
-        if r.ent1 in database.keys():
-            if r.ent2 in database[r.ent1]:
-                b.append(r)
-            else:
-                not_found.append(r)
-        else:
-            not_found.append(r)
-
-    return b, not_found
-
-
-def find_intersection(results, no_matches, database, queue):
-    while True:
-        try:
-            r = queue.get_nowait()
-            if r.ent1 in database.keys():
-                if r.ent2 in database[r.ent1]:
-                    results.append(r)
-                else:
-                    no_matches.append(r)
-            else:
-                no_matches.append(r)
-
-        except Queue.Empty:
-            break
 
 
 def calculate_b_parallel(output, database):
@@ -345,7 +309,6 @@ def calculate_b_parallel(output, database):
     return b, not_found
 
 
-@timecall
 def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigrams, rel_words_bigrams):
 
     # contains the database facts described in the corpus but not extracted by the system
@@ -511,7 +474,6 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
     return c, g_minus_d
 
 
-@timecall
 def calculate_d(g_minus_d, a, e1_type, e2_type, index, rel_type, rel_words_unigrams, rel_words_bigrams):
     # contains facts described in the corpus that are not in the system output nor in the database
     #
@@ -760,6 +722,22 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
 
             except Queue.Empty:
                 break
+
+
+def find_intersection(results, no_matches, database, queue):
+    while True:
+        try:
+            r = queue.get_nowait()
+            if r.ent1 in database.keys():
+                if r.ent2 in database[r.ent1]:
+                    results.append(r)
+                else:
+                    no_matches.append(r)
+            else:
+                no_matches.append(r)
+
+        except Queue.Empty:
+            break
 
 
 def main():
