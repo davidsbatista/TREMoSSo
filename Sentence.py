@@ -44,8 +44,8 @@ class Relationship:
                 except IndexError:
                     end = len(self.sentence) - 1
 
-                self.before = self.sentence[start:matches[x].init_bootstrap()]
-                self.between = self.sentence[matches[x].end():matches[x + 1].init_bootstrap()]
+                self.before = self.sentence[start:matches[x].start()]
+                self.between = self.sentence[matches[x].end():matches[x + 1].start()]
                 self.after = self.sentence[matches[x + 1].end(): end]
                 self.ent1 = matches[x].group()
                 self.ent2 = matches[x + 1].group()
@@ -125,18 +125,26 @@ class Sentence:
 
                     else:
                         # hard-coded examples, because tokenizer splits some entities with points.
-                        # e.g.: "U.S" becomes: [u'U.S, u'.']
                         problematic_entities = ['Ind.', 'U.S.']
-                        if ent1 in problematic_entities:
-                            ent1_parts = [ent1]
+
+                        if config.tag_type == "linked":
+                            ent1_string = re.findall('<[A-Z]+ url=[^>]+>([^<]+)</[A-Z]+>', ent1)[0]
+                            ent2_string = re.findall('<[A-Z]+ url=[^>]+>([^<]+)</[A-Z]+>', ent2)[0]
+
+                        elif config.tag_type == "simple":
+                            ent1_string = ent1
+                            ent2_string = ent2
+
+                        if ent1_string in problematic_entities:
+                            ent1_parts = [ent1_string]
                         else:
                             if config.tag_type == "simple":
                                 ent1_parts = word_tokenize(ent1)
                             elif config.tag_type == "linked":
                                 ent1_parts = word_tokenize(re.findall('<[A-Z]+ url=[^>]+>([^<]+)</[A-Z]+>', ent1)[0])
 
-                        if ent1 in problematic_entities:
-                            ent2_parts = [ent2]
+                        if ent2_string in problematic_entities:
+                            ent2_parts = [ent2_string]
                         else:
                             if config.tag_type == "simple":
                                 ent1_parts = word_tokenize(ent2)

@@ -13,10 +13,9 @@ regex_linked = re.compile('<[^>]+>', re.U)
 
 class Relationship:
     def __init__(self, _sentence, _before=None, _between=None, _after=None, _ent1=None, _ent2=None, _arg1type=None,
-                 _arg2type=None, _type=None):
+                 _arg2type=None):
 
         self.sentence = _sentence
-        self.rel_type = _type
         self.before = _before
         self.between = _between
         self.after = _after
@@ -104,7 +103,7 @@ class Sentence:
                         ent2 = re.findall('url=([^>]+)', matches[x+1].group())[0]
                         arg1type = re.findall('<([A-Z]+)', matches[x].group())[0]
                         arg2type = re.findall('<([A-Z]+)', matches[x+1].group())[0]
-                    except IndexError, e:
+                    except IndexError:
                         print _sentence
                         print "ent1", matches[x].group()
                         print "ent2", matches[x+1].group()
@@ -117,13 +116,10 @@ class Sentence:
                     if e1_type is not None and e2_type is not None:
                         # restrict relationships by the arguments semantic types
                         if arg1type == e1_type and arg2type == e2_type:
-
-                            rel = Relationship(_sentence, before, between, after, ent1, ent2, arg1type, arg2type,
-                                               _type=None)
+                            rel = Relationship(_sentence, before, between, after, ent1, ent2, arg1type, arg2type)
                             self.relationships.add(rel)
 
                     elif e1_type is None and e2_type is None:
                         # create all possible relationship types
-                        rel = Relationship(_sentence, before, between, after, ent1, ent2, arg1type, arg2type,
-                                           _type=None)
+                        rel = Relationship(_sentence, before, between, after, ent1, ent2, arg1type, arg2type)
                         self.relationships.add(rel)
