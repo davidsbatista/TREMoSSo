@@ -24,7 +24,6 @@ from collections import defaultdict
 from Sentence2 import Sentence
 
 #num_cpus = multiprocessing.cpu_count()
-m = multiprocessing.Manager()
 num_cpus = 1
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
@@ -51,8 +50,8 @@ relatioship_mappings['installations-in'] = ['<http://dbpedia.org/ontology/locati
                                             '<http://dbpedia.org/ontology/headquarter>']
 
 bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
-stopwords_list = stopwords.words('english')
-not_valid = bad_tokens + stopwords_list
+stopwords = stopwords.words('english')
+not_valid = bad_tokens + stopwords
 
 # PMI value for proximity
 PMI = 0.7
@@ -129,7 +128,7 @@ def process_corpus(queue, g_dash, e1_type, e2_type):
                 print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total added: ", added
             line = queue.get_nowait()
             line = re.sub(r'>([^<]+</[A-Z]+>)', ">", line)
-            s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords_list)
+            s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords)
             for r in s.relationships:
                 tokens = word_tokenize(r.between)
                 if all(x in not_valid for x in word_tokenize(r.between)):
@@ -224,6 +223,7 @@ def extract_bigrams(text):
 # ########################################
 @timecall
 def calculate_a(not_in_database, e1_type, e2_type, index, rel_words_unigrams, rel_words_bigrams):
+    m = multiprocessing.Manager()
     queue = m.Queue()
     results = [m.list() for _ in range(num_cpus)]
     not_found = [m.list() for _ in range(num_cpus)]
@@ -276,6 +276,7 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
     # G' = superset of G, cartesian product of all possible entities and relations (i.e., G' = E x R x E)
     # for now, all relationships from a sentence
     print "Building G', a superset of G"
+    m = multiprocessing.Manager()
     queue = m.Queue()
     g_dash = m.list()
 
@@ -431,7 +432,6 @@ def calculate_d(g_minus_d, a, e1_type, e2_type, index, rel_type, rel_words_unigr
         print "\nLoading high PMI facts not in the database", rel_type + "_high_pmi_not_in_database.pkl"
         g_minus_d = cPickle.load(f)
         f.close()
-
     else:
         m = multiprocessing.Manager()
         queue = m.Queue()
@@ -500,7 +500,8 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                     hits_without_r = 0
                     for s in hits:
                         sentence = s.get("sentence")
-                        s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW)
+                        s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW,
+                                     stopwords)
                         for s_r in s.relationships:
                             if r.ent1.decode("utf8") == s_r.ent1 and r.ent2.decode("utf8") == s_r.ent2:
                                 unigrams_rel_words = word_tokenize(s_r.between)
