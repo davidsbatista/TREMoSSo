@@ -32,7 +32,7 @@ founder_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofound
 founder_bigrams = ['started by']
 
 acquired_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
-acquired_bigrams = []
+acquired_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns']
 
 installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office', 'building', 'buildings', 'factory',
                              'plant', 'compund']
