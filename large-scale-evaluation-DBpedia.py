@@ -32,7 +32,7 @@ founder_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofound
 founder_bigrams = ['started by']
 
 acquired_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
-acquired_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns']
+acquired_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 'owned by']
 
 installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office', 'building', 'buildings', 'factory',
                              'plant', 'compund']
@@ -52,7 +52,7 @@ located_in_bigrams = ['capital of', 'suburb of', 'city of', 'island', 'region of
                       'northwest of', 'town in']
 
 
-# tokens between entities which do net represent relationships
+# tokens between entities which do not represent relationships
 bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
 stopwords = stopwords.words('english')
 not_valid = bad_tokens + stopwords
@@ -602,13 +602,13 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
 
                 # Entities proximity considering relational words
                 # From the results above count how many contain a relational word
-                print entity1, '\t', entity2, len(hits), "\n"
+                #print entity1, '\t', entity2, len(hits), "\n"
 
                 hits_with_r = 0
                 hits_without_r = 0
                 fact_bet_words_tokens = word_tokenize(r.bet_words)
 
-                print "fact words", fact_bet_words_tokens
+                #print "fact words", fact_bet_words_tokens
 
                 for s in hits:
                     sentence = s.get("sentence")
@@ -993,23 +993,31 @@ def main():
     # Write relationships not found in the Database nor with high PMI relatation words to disk
     f = open(rel_type + "_negative.txt", "w")
     for r in sorted(set(not_found), reverse=True):
-        f.write('instance :' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
-        f.write('sentence :' + r.sentence + '\n')
-        f.write('bef_words:' + r.bef_words + '\n')
-        f.write('bet_words:' + r.bet_words + '\n')
-        f.write('aft_words:' + r.aft_words + '\n')
-        f.write('\n')
+        if r.passive_voice is True:
+            f.write('instance : ' + r.ent2 + '\t' + r.ent1 + '\t' + str(r.score) + '\n')
+        else:
+            f.write('instance : ' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
+            f.write('sentence : ' + r.sentence + '\n')
+            f.write('bef_words: ' + r.bef_words + '\n')
+            f.write('bet_words: ' + r.bet_words + '\n')
+            f.write('aft_words: ' + r.aft_words + '\n')
+            f.write('passive voice: ' + str(r.passive_voice) + '\n')
+            f.write('\n')
     f.close()
 
     # Write all correct relationships (sentence, entities and score) to file
     f = open(rel_type + "_positive.txt", "w")
     for r in sorted(set(a).union(b), reverse=True):
-        f.write('instance :' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
-        f.write('sentence :' + r.sentence + '\n')
-        f.write('bef_words:' + r.bef_words + '\n')
-        f.write('bet_words:' + r.bet_words + '\n')
-        f.write('aft_words:' + r.aft_words + '\n')
-        f.write('\n')
+        if r.passive_voice is True:
+            f.write('instance :' + r.ent2 + '\t' + r.ent1 + '\t' + str(r.score) + '\n')
+        else:
+            f.write('instance : ' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
+            f.write('sentence : ' + r.sentence + '\n')
+            f.write('bef_words: ' + r.bef_words + '\n')
+            f.write('bet_words: ' + r.bet_words + '\n')
+            f.write('aft_words: ' + r.aft_words + '\n')
+            f.write('passive voice: ' + str(r.passive_voice) + '\n')
+            f.write('\n')
     f.close()
 
     a = set(a)
