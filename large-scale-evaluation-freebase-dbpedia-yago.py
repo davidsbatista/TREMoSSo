@@ -27,31 +27,32 @@ num_cpus = multiprocessing.cpu_count()
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
+#TODO: mais palavras
 founder_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofounded', 'founded', 'founders']
 founder_bigrams = ['started by']
 
 acquired_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
-acquired_bigrams = []
+acquired_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 'owned by']
 
 installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office', 'building', 'buildings', 'factory',
                              'plant', 'compund']
 
 installations_in_bigrams = ['based in', 'located in', 'main office', ' main offices', 'offices in', 'building in',
                             'office in', 'branch in', 'store in', 'firm in', 'factory in', 'plant in', 'head office',
-                            'head offices', 'in central', 'in downton', 'outskirts of', 'suburs of']
+                            'head offices', 'in central', 'in downton', 'outskirts of', 'suburs of', 'branch in']
 
-#TODO: mais palavras
 employment_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer']
 employment_bigrams = []
 
 studied_unigrams = ['graduated', 'earned', 'degree']
-studied_bigrams = ['graduated from', 'earned phd']
+studied_bigrams = ['graduated from', 'earned phd', 'studies at', 'studied at', 'student at']
 
-located_in_unigrams = None
-located_in_bigrams = None
+located_in_unigrams = ['capital', 'suburb', 'city', 'island', 'region']
+located_in_bigrams = ['capital of', 'suburb of', 'city of', 'island', 'region of', 'in southern', 'in northern',
+                      'northwest of', 'town in']
 
 
-# tokens between entities which do net represent relationships
+# tokens between entities which do not represent relationships
 bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
 stopwords = stopwords.words('english')
 not_valid = bad_tokens + stopwords
@@ -105,9 +106,9 @@ class ExtractedFact(object):
             return False
 
 
-# ###########################################
-# Misc., Utils, parsing corpus into memory #
-# ###########################################
+# ##################################
+# Misc., Utils, parsing text files #
+# ##################################
 
 def timecall(f):
     @functools.wraps(f)
@@ -115,7 +116,6 @@ def timecall(f):
         start = time.time()
         result = f(*args, **kw)
         end = time.time()
-        # print "%s %.2f seconds" % (f.__name__, end - start)
         print "Time taken: %.2f seconds" % (end - start)
         return result
 
@@ -607,7 +607,6 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                 if count % 50 == 0:
                     print multiprocessing.current_process(), "To Process", queue.qsize(), "Correct found:", len(results)
 
-                # if its not in the database calculate the PMI
                 entity1 = "<"+e1_type+" url="+r.ent1+">"
                 entity2 = "<"+e2_type+" url="+r.ent2+">"
                 t1 = query.Term('sentence', entity1)
@@ -625,6 +624,8 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                 hits_without_r = 0
                 fact_bet_words_tokens = word_tokenize(r.bet_words)
 
+                #print "fact words", fact_bet_words_tokens
+
                 for s in hits:
                     sentence = s.get("sentence")
                     start_e1 = sentence.rindex(entity1)
@@ -638,40 +639,62 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     bet_tokens = word_tokenize(bet)
                     aft_tokens = word_tokenize(aft)
 
-                    if not (MIN_TOKENS_AWAY >= len(bet_tokens) <= MAX_TOKENS_AWAY):
+                    if not (MIN_TOKENS_AWAY <= len(bet_tokens) <= MAX_TOKENS_AWAY):
                         continue
+
                     else:
                         bef_tokens = bef_tokens[CONTEXT_WINDOW:]
                         aft_tokens = aft_tokens[:CONTEXT_WINDOW]
 
-                    unigrams_bef_words = bef_tokens
-                    unigrams_bet_words = bet_tokens
-                    unigrams_aft_words = aft_tokens
-                    bigrams_rel_words = extract_bigrams(bet)
+                        unigrams_bef_words = bef_tokens
+                        unigrams_bet_words = bet_tokens
+                        unigrams_aft_words = aft_tokens
+                        bigrams_rel_words = extract_bigrams(bet)
 
-                    if fact_bet_words_tokens == unigrams_bet_words:
-                        #print "****HIT**** 2"
-                        hits_with_r += 1
+                        if fact_bet_words_tokens == rel_words_unigrams:
+                            #print "****HIT**** 2"
+                            hits_with_r += 1
 
-                    elif any(x in rel_words_unigrams for x in unigrams_bef_words):
-                        #print "****HIT**** 4"
-                        hits_with_r += 1
+                        elif any(x in rel_words_unigrams for x in unigrams_bef_words):
+                            #print "****HIT**** 4"
+                            hits_with_r += 1
 
-                    elif any(x in rel_words_unigrams for x in unigrams_bet_words):
-                        #print "****HIT**** 5"
-                        hits_with_r += 1
+                        elif any(x in rel_words_unigrams for x in unigrams_bet_words):
+                            #print "****HIT**** 5"
+                            hits_with_r += 1
 
-                    elif any(x in rel_words_unigrams for x in unigrams_aft_words):
-                        #print "****HIT**** 6"
-                        hits_with_r += 1
+                        elif any(x in rel_words_unigrams for x in unigrams_aft_words):
+                            #print "****HIT**** 6"
+                            hits_with_r += 1
 
-                    elif rel_words_bigrams == bigrams_rel_words:
-                        #print "****HIT**** 7"
-                        hits_with_r += 1
-                    else:
-                        hits_without_r += 1
+                        elif len(set(rel_words_bigrams).intersection(set(bigrams_rel_words)))>0:
+                            #print "****HIT**** 7"
+                            hits_with_r += 1
+                        else:
+                            hits_without_r += 1
 
-                if hits_with_r > 0 and hits_without_r > 0:
+                """
+                print "hits_with_r", hits_with_r
+                print "hits_without_r", hits_without_r
+                print
+                """
+
+                if hits_with_r > 0 and hits_without_r == 0:
+                    # it can be the case that hits_with_r > 0 and hits_without_r = 0
+                    # i.e.:
+                    #   all the ocurrences of the two entities are with the 'fact_bet_words_tokens' (from the output)
+                    #   this should be considered as positive match
+                    results.append(r)
+                    """
+                    print "**VALID**:", entity1, '\t', entity2
+                    print "hits_without_r ", float(hits_without_r)
+                    print "hits_with_r ", float(hits_with_r)
+                    print r.sentence
+                    print r.bet_words
+                    print
+                    """
+
+                elif hits_with_r > 0 and hits_without_r > 0:
                     pmi = float(hits_with_r) / float(hits_without_r)
                     if pmi >= PMI:
                         results.append(r)
@@ -684,9 +707,9 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print r.bet_words
                         print
                         """
+
                     else:
                         not_found.append(r)
-                        #TODO: confirmar os invalids
                         """
                         print "**INVALID**:"
                         print 'ExtractedFact:', entity1, '\t', entity2
@@ -715,10 +738,10 @@ def find_intersection(results, no_matches, database, queue):
     count = 0
     while True:
         try:
-            if count % 25000 == 0:
-                print multiprocessing.current_process(), "In Queue", queue.qsize()
             r = queue.get_nowait()
             count += 1
+            if count % 50000 == 0:
+                print multiprocessing.current_process(), "In Queue", queue.qsize()
             if r.ent1 in database.keys():
                 if r.ent2 in database[r.ent1]:
                     results.append(r)
@@ -742,17 +765,6 @@ def process_corpus(queue, g_dash, e1_type, e2_type):
             line = re.sub(r'>([^<]+</[A-Z]+>)', ">", line)
             s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords)
             for r in s.relationships:
-                """
-                print r.sentence
-                print r.before
-                print r.between
-                print r.after
-                print r.ent1
-                print r.ent2
-                print r.arg1type
-                print r.arg2type
-                """
-
                 tokens = word_tokenize(r.between)
                 if all(x in not_valid for x in word_tokenize(r.between)):
                     continue
@@ -878,8 +890,8 @@ def main():
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
 
     elif rel_type == 'studied':
-        e1_type = "ORG"
-        e2_type = "PER"
+        e1_type = "PER"
+        e2_type = "ORG"
         rel_words_unigrams = studied_unigrams
         rel_words_bigrams = studied_bigrams
         freebase_ground_truth = []
@@ -1019,23 +1031,31 @@ def main():
     # Write relationships not found in the Database nor with high PMI relatation words to disk
     f = open(rel_type + "_negative.txt", "w")
     for r in sorted(set(not_found), reverse=True):
-        f.write('instance :' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
-        f.write('sentence :' + r.sentence + '\n')
-        f.write('bef_words:' + r.bef_words + '\n')
-        f.write('bet_words:' + r.bet_words + '\n')
-        f.write('aft_words:' + r.aft_words + '\n')
-        f.write('\n')
+        if r.passive_voice is True:
+            f.write('instance : ' + r.ent2 + '\t' + r.ent1 + '\t' + str(r.score) + '\n')
+        else:
+            f.write('instance : ' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
+            f.write('sentence : ' + r.sentence + '\n')
+            f.write('bef_words: ' + r.bef_words + '\n')
+            f.write('bet_words: ' + r.bet_words + '\n')
+            f.write('aft_words: ' + r.aft_words + '\n')
+            f.write('passive voice: ' + str(r.passive_voice) + '\n')
+            f.write('\n')
     f.close()
 
     # Write all correct relationships (sentence, entities and score) to file
     f = open(rel_type + "_positive.txt", "w")
     for r in sorted(set(a).union(b), reverse=True):
-        f.write('instance :' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
-        f.write('sentence :' + r.sentence + '\n')
-        f.write('bef_words:' + r.bef_words + '\n')
-        f.write('bet_words:' + r.bet_words + '\n')
-        f.write('aft_words:' + r.aft_words + '\n')
-        f.write('\n')
+        if r.passive_voice is True:
+            f.write('instance :' + r.ent2 + '\t' + r.ent1 + '\t' + str(r.score) + '\n')
+        else:
+            f.write('instance : ' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
+            f.write('sentence : ' + r.sentence + '\n')
+            f.write('bef_words: ' + r.bef_words + '\n')
+            f.write('bet_words: ' + r.bet_words + '\n')
+            f.write('aft_words: ' + r.aft_words + '\n')
+            f.write('passive voice: ' + str(r.passive_voice) + '\n')
+            f.write('\n')
     f.close()
 
     a = set(a)
