@@ -182,6 +182,7 @@ def process_dbpedia(data, database, file_rel_type):
             sys.exit(0)
 
         # follow the order of the relationships as in the output
+        #TODO: check order of entities for each rel_type
         if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt']:
             database[e2.strip().decode("utf8")].append(e1.strip().decode("utf8"))
         else:
@@ -204,10 +205,25 @@ def process_yago(data, database, rel_type):
         e2 = "http://en.wikipedia.org/wiki/"+e2
 
         # follow the order of the relationships as in the output
+        #TODO: check order of entities for each rel_type
         if rel_type in ['founder', 'affiliation']:
             database[e2.strip().decode("utf8")].append(e1.strip().decode("utf8"))
         else:
             database[e1.strip().decode("utf8")].append(e2.strip().decode("utf8"))
+    fileinput.close()
+
+
+def process_freebase(data, database, rel_type):
+    for line in fileinput.input(data):
+        try:
+            e1, rel, e2 = line.strip().split('\t')
+        except ValueError:
+            print "Error parsing", line
+            sys.exit(0)
+
+        # follow the order of the relationships as in the output
+        #TODO: check order of entities for each rel_type
+        database[e1.strip().decode("utf8")].append(e2.strip().decode("utf8"))
     fileinput.close()
 
 
@@ -784,10 +800,10 @@ def main():
     print "System output relationships   :", len(system_output)
 
     # corpus from which the system extracted relationships
-    corpus = "/home/dsbatista/gigaword/AFP-AIDA-Linked/documents/all_sentences_6_months.txt"
+    corpus = "/home/dsbatista/gigaword/set_a_matched.txt"
 
     # index to be used to estimate proximity PMI
-    index = "/home/dsbatista/gigaword/AFP-AIDA-Linked/evaluation/index_full"
+    index = "/home/dsbatista/gigaword/automatica-evaluation/index_full"
 
     """
     affiliation                           & PER & ORG
@@ -849,13 +865,14 @@ def main():
     disagrees-with                        & PER & PER
     """
 
-    base_dir = "/home/dsbatista/gigaword/AFP-AIDA-Linked/evaluation/ground-truth/"
+    base_dir = "/home/dsbatista/gigaword/automatic-evaluations/relationships_gold/"
 
     if rel_type == 'installations-in':
         e1_type = "ORG"
         e2_type = "LOC"
         rel_words_unigrams = installations_in_unigrams
         rel_words_bigrams = installations_in_bigrams
+        freebase_ground_truth = [base_dir+"freebase_place_founded.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_location.txt", base_dir+"dbpedia_headquarter.txt",
                                 base_dir+"dbpedia_locationCity.txt", base_dir+"dbpedia_locationCountry.txt"]
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
@@ -865,6 +882,7 @@ def main():
         e2_type = "PER"
         rel_words_unigrams = studied_unigrams
         rel_words_bigrams = studied_bigrams
+        freebase_ground_truth = []
         dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
         yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
 
@@ -873,6 +891,7 @@ def main():
         e2_type = "PER"
         rel_words_unigrams = founder_unigrams
         rel_words_bigrams = founder_unigrams
+        freebase_ground_truth = [base_dir+"freebase_founded.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
         yago_ground_truth = [base_dir+"yago_created.txt"]
 
@@ -881,6 +900,7 @@ def main():
         e2_type = "ORG"
         rel_words_unigrams = acquired_unigrams
         rel_words_bigrams = acquired_unigrams
+        freebase_ground_truth = [base_dir+"freebase_acquired.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_subsidiary.txt"]
         yago_ground_truth = [base_dir+"yago_owns.txt"]
 
@@ -889,6 +909,7 @@ def main():
         e2_type = "LOC"
         rel_words_unigrams = located_in_unigrams
         rel_words_bigrams = located_in_bigrams
+        freebase_ground_truth = [base_dir+"freebase_location_citytown.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_locatedInArea.txt"]
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
 
@@ -897,8 +918,17 @@ def main():
         e2_type = "PER"
         rel_words_unigrams = employment_unigrams
         rel_words_bigrams = employment_bigrams
+        freebase_ground_truth = [base_dir+"freebase_employment.txt", base_dir+"freebase_governance.txt",
+                                 base_dir+"freebase_leader_of.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_affiliation.txt"]
         yago_ground_truth = [base_dir+"yago_affiliation.txt", base_dir+"yago_worksAt.txt"]
+
+        #TODO: new relationships
+        #freebase_married_to.txt
+        #freebase_sibling.txt
+        #freebase_spouse_partner.txt
+        #freebase_venture_investment.txt
+
     else:
         print "Invalid relationship type", rel_type
         sys.exit(0)
@@ -909,6 +939,14 @@ def main():
 
     # load relationships into database
     database = defaultdict(list)
+    #TODO: confirmar as ordens das entidades quando são guardadas em 'database'
+
+    print "\nLoading relationships from Freebase"
+    for f in dbpedia_ground_truth:
+        print f.split('/')[-1],
+        #TODO: process_freebase(freebase_ground_truth, database, f.split('/')[-1])
+        print
+
     print "\nLoading relationships from DBpedia"
     for f in dbpedia_ground_truth:
         print f.split('/')[-1],
