@@ -215,6 +215,8 @@ def process_yago(data, database, rel_type):
 
 def process_freebase(data, database, rel_type):
     for line in fileinput.input(data):
+        if line.startswith("#"):
+            continue
         try:
             e1, rel, e2 = line.strip().split('\t')
         except ValueError:
@@ -607,8 +609,9 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                 if count % 50 == 0:
                     print multiprocessing.current_process(), "To Process", queue.qsize(), "Correct found:", len(results)
 
-                entity1 = "<"+e1_type+" url="+r.ent1+">"
-                entity2 = "<"+e2_type+" url="+r.ent2+">"
+                # if its not in the database calculate the PMI
+                entity1 = "<" + e1_type + ">" + r.ent1 + "</" + e1_type + ">"
+                entity2 = "<" + e2_type + ">" + r.ent2 + "</" + e2_type + ">"
                 t1 = query.Term('sentence', entity1)
                 t3 = query.Term('sentence', entity2)
 
@@ -815,7 +818,7 @@ def main():
     corpus = "/home/dsbatista/gigaword/set_a_matched.txt"
 
     # index to be used to estimate proximity PMI
-    index = "/home/dsbatista/gigaword/automatica-evaluation/index_full"
+    index = "/home/dsbatista/gigaword/automatic-evaluation/index_full"
 
     """
     affiliation                           & PER & ORG
@@ -877,9 +880,9 @@ def main():
     disagrees-with                        & PER & PER
     """
 
-    base_dir = "/home/dsbatista/gigaword/automatic-evaluations/relationships_gold/"
+    base_dir = "/home/dsbatista/gigaword/automatic-evaluation/relationships_gold/"
 
-    if rel_type == 'installations-in':
+    if rel_type == 'has-installations':
         e1_type = "ORG"
         e2_type = "LOC"
         rel_words_unigrams = installations_in_unigrams
@@ -954,9 +957,9 @@ def main():
     #TODO: confirmar as ordens das entidades quando são guardadas em 'database'
 
     print "\nLoading relationships from Freebase"
-    for f in dbpedia_ground_truth:
+    for f in freebase_ground_truth:
         print f.split('/')[-1],
-        #TODO: process_freebase(freebase_ground_truth, database, f.split('/')[-1])
+        process_freebase(freebase_ground_truth, database, f.split('/')[-1])
         print
 
     print "\nLoading relationships from DBpedia"
