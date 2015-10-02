@@ -23,7 +23,7 @@ from nltk.corpus import stopwords
 from collections import defaultdict
 from Sentence import Sentence
 
-num_cpus = multiprocessing.cpu_count()
+num_cpus = 0
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
@@ -75,8 +75,8 @@ all_in_database = manager.dict()
 
 class ExtractedFact(object):
     def __init__(self, _e1, _e2, _score, _bef, _bet, _aft, _sentence, _passive_voice):
-        self.ent1 = _e1
-        self.ent2 = _e2
+        self.e1 = _e1
+        self.e2 = _e2
         self.score = _score
         self.bef_words = _bef
         self.bet_words = _bet
@@ -93,7 +93,7 @@ class ExtractedFact(object):
                 return 0
 
     def __hash__(self):
-        sig = hash(self.ent1) ^ hash(self.ent2) ^ hash(self.bef_words) ^ hash(self.bet_words) ^ hash(self.aft_words) ^ \
+        sig = hash(self.e1) ^ hash(self.e2) ^ hash(self.bef_words) ^ hash(self.bet_words) ^ hash(self.aft_words) ^ \
             hash(self.score) ^ hash(self.sentence)
         return sig
 
@@ -174,8 +174,8 @@ def process_dbpedia(data, database, file_rel_type):
     for line in fileinput.input(data):
         try:
             e1, rel, e2, p = line.strip().split('>')
-            e1 = e1.replace("<http://dbpedia.org/resource/", "http://en.wikipedia.org/wiki/")
-            e2 = e2.replace("<http://dbpedia.org/resource/", "http://en.wikipedia.org/wiki/")
+            e1 = e1.replace("<http://dbpedia.org/resource/", '')
+            e2 = e2.replace("<http://dbpedia.org/resource/", '')
 
         except ValueError:
             print "Error parsing", line
@@ -192,6 +192,7 @@ def process_dbpedia(data, database, file_rel_type):
 
 def process_yago(data, database, rel_type):
     for line in fileinput.input(data):
+        #TODO: remove  "de/" "fr/"
         try:
             e1, rel, e2 = line.strip().split('\t')
             e1 = e1.replace("<", "").replace(">", "")
@@ -199,10 +200,6 @@ def process_yago(data, database, rel_type):
         except ValueError:
             print "Error parsing", line
             sys.exit(0)
-
-        # to have the same URL links has from the output and DBpedia
-        e1 = "http://en.wikipedia.org/wiki/"+e1
-        e2 = "http://en.wikipedia.org/wiki/"+e2
 
         # follow the order of the relationships as in the output
         #TODO: check order of entities for each rel_type
@@ -317,6 +314,9 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         f = open("superset_" + e1_type + "_" + e2_type + ".pkl")
         print "\nLoading superset G'", "superset_" + e1_type + "_" + e2_type + ".pkl"
         g_dash_set = cPickle.load(f)
+
+        for r in g_dash_set:
+            print r.e1, r.bet_words, r.e2
         f.close()
 
     # else generate G' and G minus D
@@ -380,8 +380,12 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         no_matches = [manager.list() for _ in range(num_cpus)]
 
         # Load everything into a shared queue
+        print "Loading data into a queue..."
+        count = 0
         for r in g_dash_set:
-            queue.put(r)
+            if count % 1000 == 0:
+                queue.put(r)
+            count += 1
 
         processes = [multiprocessing.Process(target=find_intersection, args=(results[i], no_matches[i], database,
                                                                              queue))
@@ -406,10 +410,13 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         filtered = set()
 
         for r in g_intersect_d:
-            unigrams_bet = word_tokenize(r.between)
-            unigrams_bef = word_tokenize(r.before)
-            unigrams_aft = word_tokenize(r.after)
-            bigrams_bet = extract_bigrams(r.between)
+            #unigrams_bet = word_tokenize(r.between)
+            unigrams_bet = r.between
+            #unigrams_bef = word_tokenize(r.before)
+            unigrams_bef = r.before
+            #unigrams_aft = word_tokenize(r.after)
+            unigrams_aft = r.after
+            bigrams_bet = extract_bigrams(''.join(r.between))
             if any(x in rel_words_unigrams for x in unigrams_bet):
                 filtered.add(r)
                 continue
@@ -433,10 +440,13 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         print "Extra filtering: from the G' not in D, select only those based on keywords"
         filtered = set()
         for r in g_minus_d:
-            unigrams_bet = word_tokenize(r.between)
-            unigrams_bef = word_tokenize(r.before)
-            unigrams_aft = word_tokenize(r.after)
-            bigrams_bet = extract_bigrams(r.between)
+            #unigrams_bet = word_tokenize(r.between)
+            unigrams_bet = r.between
+            #unigrams_bef = word_tokenize(r.before)
+            unigrams_bef = r.before
+            #unigrams_aft = word_tokenize(r.after)
+            unigrams_aft = r.after
+            bigrams_bet = extract_bigrams(''.join(r.between))
             if any(x in rel_words_unigrams for x in unigrams_bet):
                 filtered.add(r)
                 continue
@@ -607,11 +617,13 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                 r = queue.get_nowait()
                 count += 1
                 if count % 50 == 0:
-                    print multiprocessing.current_process(), "To Process", queue.qsize(), "Correct found:", len(results)
+                    sys.stdout.write(multiprocessing.current_process()+" To Process: " +
+                                     str(queue.qsize())+" Correct found: "+str(len(results)))
+                    sys.stdout.flush()
 
                 # if its not in the database calculate the PMI
-                entity1 = "<" + e1_type + ">" + r.ent1 + "</" + e1_type + ">"
-                entity2 = "<" + e2_type + ">" + r.ent2 + "</" + e2_type + ">"
+                entity1 = "<" + e1_type + ">" + r.e1 + "</" + e1_type + ">"
+                entity2 = "<" + e2_type + ">" + r.e2 + "</" + e2_type + ">"
                 t1 = query.Term('sentence', entity1)
                 t3 = query.Term('sentence', entity2)
 
@@ -743,10 +755,10 @@ def find_intersection(results, no_matches, database, queue):
         try:
             r = queue.get_nowait()
             count += 1
-            if count % 50000 == 0:
+            if count % 500 == 0:
                 print multiprocessing.current_process(), "In Queue", queue.qsize()
-            if r.ent1 in database.keys():
-                if r.ent2 in database[r.ent1]:
+            if r.e1 in database.keys():
+                if r.e2 in database[r.e1]:
                     results.append(r)
                 else:
                     no_matches.append(r)
@@ -765,13 +777,11 @@ def process_corpus(queue, g_dash, e1_type, e2_type):
             if count % 25000 == 0:
                 print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total added: ", added
             line = queue.get_nowait()
-            line = re.sub(r'>([^<]+</[A-Z]+>)', ">", line)
             s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords)
             for r in s.relationships:
-                tokens = word_tokenize(r.between)
-                if all(x in not_valid for x in word_tokenize(r.between)):
+                if all(x in not_valid for x in r.between):
                     continue
-                elif "," in tokens and tokens[0] != ',':
+                elif "," in r.between and r.between[0] != ',':
                     continue
                 else:
                     g_dash.append(r)
@@ -809,13 +819,18 @@ def main():
     threhsold = float(sys.argv[1])
     rel_type = sys.argv[3]
 
+    global num_cpus
+    num_cpus = int(sys.argv[4])
+
     # load relationships extracted by the system
+    #TODO: passar logo para uma Queue
     system_output = process_output(sys.argv[2], threhsold, rel_type)
     print "Relationships score threshold :", threhsold
     print "System output relationships   :", len(system_output)
 
     # corpus from which the system extracted relationships
     corpus = "/home/dsbatista/gigaword/set_a_matched.txt"
+    #corpus = "/home/dsbatista/gigaword/automatic-evaluation/sentences_test.txt"
 
     # index to be used to estimate proximity PMI
     index = "/home/dsbatista/gigaword/automatic-evaluation/index_full"
@@ -991,7 +1006,6 @@ def main():
     print "Found in database  :", len(b)
     print "Correct in corpus  :", len(a)
     print "Not found          :", len(not_found)
-    print "\n"
     assert len(system_output) == len(a) + len(b) + len(not_found)
 
     # Estimate G \intersected D = |b| + |c|, looking for relationships in G' that match a relationship in D
@@ -1000,11 +1014,14 @@ def main():
     print "\nCalculating set C: database facts in the corpus but not extracted by the system"
     c, g_minus_d = calculate_c(corpus, database, b, e1_type, e2_type, rel_type,
                                rel_words_unigrams, rel_words_bigrams)
+
+    print c
+
     assert len(c) > 0
 
     uniq_c = set()
     for r in c:
-        uniq_c.add((r.ent1, r.ent2))
+        uniq_c.add((r.e1, r.e2))
 
     # By applying the PMI of the facts not in the database (i.e., G' \in D)
     # we determine |G \ D|, then we can estimate |d| = |G \ D| - |a|
