@@ -4,122 +4,148 @@
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
 
-import sys
 import re
 from nltk import word_tokenize
+from nltk.corpus import stopwords
 
-regex_linked = re.compile('<[^>]+>', re.U)
+# tokens between entities which do not represent relationships
+bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
+stopwords = stopwords.words('english')
+not_valid = bad_tokens + stopwords
+
+
+def tokenize_entity(entity):
+    parts = word_tokenize(entity)
+    if parts[-1] == '.':
+        replace = parts[-2] + parts[-1]
+        del parts[-1]
+        del parts[-1]
+        parts.append(replace)
+    return parts
+
+
+def find_locations(entity_string, text_tokens):
+    locations = []
+    e_parts = tokenize_entity(entity_string)
+    for i in range(len(text_tokens)):
+        if text_tokens[i:i + len(e_parts)] == e_parts:
+            locations.append(i)
+    return e_parts, locations
+
+
+class EntitySimple:
+    def __init__(self, _e_string, _e_parts, _e_type, _locations):
+        self.string = _e_string
+        self.parts = _e_parts
+        self.type = _e_type
+        self.locations = _locations
+
+    def __hash__(self):
+        return hash(self.string) ^ hash(self.type)
+
+    def __eq__(self, other):
+        return self.string == other.string and self.type == other.type
+
+
+class EntityLinked:
+    def __init__(self, _e_string, _e_parts, _e_type, _locations, _url=None):
+        self.string = _e_string
+        self.parts = _e_parts
+        self.type = _e_type
+        self.locations = _locations
+        self.url = _url
+
+    def __hash__(self):
+        return hash(self.url)
+
+    def __eq__(self, other):
+        return self.url == other.url
 
 
 class Relationship:
-    def __init__(self, _sentence, _before=None, _between=None, _after=None, _ent1=None, _ent2=None, _arg1type=None,
-                 _arg2type=None):
-
+    def __init__(self, _sentence, _before, _between, _after, _ent1, _ent2, e1_type, e2_type):
         self.sentence = _sentence
         self.before = _before
         self.between = _between
         self.after = _after
-        self.ent1 = _ent1
-        self.ent2 = _ent2
-        self.arg1type = _arg1type
-        self.arg2type = _arg2type
-
-        if _before is None and _between is None and _after is None and _sentence is not None:
-            matches = []
-            for m in re.finditer(regex_linked, self.sentence):
-                matches.append(m)
-
-            for x in range(0, len(matches) - 1):
-                if x == 0:
-                    start = 0
-                if x > 0:
-                    start = matches[x - 1].end()
-                try:
-                    end = matches[x + 2].init_bootstrapp()
-                except IndexError:
-                    end = len(self.sentence) - 1
-
-                self.before = self.sentence[start:matches[x].init_bootstrapp()]
-                self.between = self.sentence[matches[x].end():matches[x + 1].init_bootstrapp()]
-                self.after = self.sentence[matches[x + 1].end(): end]
-                self.ent1 = matches[x].group()
-                self.ent2 = matches[x + 1].group()
-                arg1match = re.match("<[A-Z]+>", self.ent1)
-                arg2match = re.match("<[A-Z]+>", self.ent2)
-                self.arg1type = arg1match.group()[1:-1]
-                self.arg2type = arg2match.group()[1:-1]
+        self.e1 = _ent1
+        self.e2 = _ent2
+        self.e1_type = e1_type
+        self.e2_type = e2_type
 
     def __eq__(self, other):
-        if self.ent1 == other.ent1 and self.before == other.before and self.between == other.between \
+        if self.e1 == other.e1 and self.before == other.before and self.between == other.between \
                 and self.after == other.after:
             return True
         else:
             return False
 
     def __hash__(self):
-        return hash(self.ent1) ^ hash(self.ent2) ^ hash(self.before) ^ hash(self.between) ^ hash(self.after)
+        return hash(self.e1) ^ hash(self.e2) ^ hash(''.join(self.before)) ^ hash(''.join(self.between))\
+               ^ hash(''.join(self.after))
 
 
 class Sentence:
-    def __init__(self, _sentence, e1_type, e2_type, max_tokens, min_tokens, window_size, stopwords):
-        self.relationships = set()
-        self.sentence = _sentence
-        matches = []
 
-        for m in re.finditer(regex_linked, self.sentence):
-            matches.append(m)
+    def __init__(self, sentence, e1_type, e2_type, max_tokens, min_tokens, window_size, pos_tagger=None, config=None):
+        self.relationships = list()
 
-        if len(matches) >= 2:
-            for x in range(0, len(matches) - 1):
-                if x == 0:
-                    start = 0
-                if x > 0:
-                    start = matches[x - 1].end()
-                try:
-                    end = matches[x + 2].start()
-                except IndexError:
-                    end = len(self.sentence) - 1
+        #determine which type of regex to use according to how named-entties are tagged
+        entities_regex = re.compile('<[A-Z]+>[^<]+</[A-Z]+>', re.U)
+        regex_clean_simple = re.compile('</?[A-Z]+>', re.U)
 
-                before = self.sentence[start:matches[x].start()]
-                between = self.sentence[matches[x].end():matches[x + 1].start()]
-                after = self.sentence[matches[x + 1].end(): end]
+        # find named-entities
+        entities = []
+        for m in re.finditer(entities_regex, sentence):
+            entities.append(m)
 
-                # select 'window_size' tokens from left and right context
-                before = word_tokenize(before)[-window_size:]
-                bet_words = word_tokenize(between)
-                after = word_tokenize(after)[:window_size]
-                before = ' '.join(before)
-                after = ' '.join(after)
+        if len(entities) >= 2:
+            # clean tags from text
+            sentence_no_tags = re.sub(regex_clean_simple, "", sentence)
+            text_tokens = word_tokenize(sentence_no_tags)
 
-                if set(bet_words) <= set(stopwords):
-                    continue
+            # extract information about the entity, create an Entity instance and store in a
+            # structure to hold information collected about all the entities in the sentence
+            entities_info = set()
+            for x in range(0, len(entities)):
+                entity = entities[x].group()
+                e_string = re.findall('<[A-Z]+>([^<]+)</[A-Z]+>', entity)[0]
+                e_type = re.findall('<([A-Z]+)', entity)[0]
+                e_parts, locations = find_locations(e_string, text_tokens)
+                e = EntitySimple(e_string, e_parts, e_type, locations)
+                entities_info.add(e)
 
-                # only consider relationships where the distance between the two entities
-                # is less than 'max_tokens' and greater than 'min_tokens'
-                elif not len(bet_words) > max_tokens and not len(bet_words) < min_tokens:
-                    # linked tags
-                    try:
-                        ent1 = re.findall('url=([^>]+)', matches[x].group())[0]
-                        ent2 = re.findall('url=([^>]+)', matches[x+1].group())[0]
-                        arg1type = re.findall('<([A-Z]+)', matches[x].group())[0]
-                        arg2type = re.findall('<([A-Z]+)', matches[x+1].group())[0]
-                    except IndexError:
-                        print _sentence
-                        print "ent1", matches[x].group()
-                        print "ent2", matches[x+1].group()
-                        ent2 = re.findall('url=([^>]+)', matches[x+1].group())[0]
-                        sys.exit(0)
+            # create an hashtable on which:
+            # - the key is the starting index in the tokenized sentence of an entity
+            # - the value the corresponding Entity instance
+            locations = dict()
+            for e in entities_info:
+                for start in e.locations:
+                    locations[start] = e
 
-                    if ent1 == ent2:
+            # look for pair of entities such that:
+            # the distance between the two entities is less than 'max_tokens' and greater than 'min_tokens'
+            # the arguments match the seeds semantic types
+            sorted_keys = list(sorted(locations))
+            for i in range(len(sorted_keys)-1):
+                distance = sorted_keys[i+1] - sorted_keys[i]
+                e1 = locations[sorted_keys[i]]
+                e2 = locations[sorted_keys[i+1]]
+                if max_tokens >= distance >= min_tokens and e1.type == e1_type and e2.type == e2_type:
+
+                    # ignore relationships between the same entity
+                    if e1.string == e2.string:
                         continue
 
-                    if e1_type is not None and e2_type is not None:
-                        # restrict relationships by the arguments semantic types
-                        if arg1type == e1_type and arg2type == e2_type:
-                            rel = Relationship(_sentence, before, between, after, ent1, ent2, arg1type, arg2type)
-                            self.relationships.add(rel)
+                    before = text_tokens[:sorted_keys[i]]
+                    before = before[-window_size:]
+                    between = text_tokens[sorted_keys[i]+len(e1.parts):sorted_keys[i+1]]
+                    after = text_tokens[sorted_keys[i+1]+len(e2.parts):]
+                    after = after[:window_size]
 
-                    elif e1_type is None and e2_type is None:
-                        # create all possible relationship types
-                        rel = Relationship(_sentence, before, between, after, ent1, ent2, arg1type, arg2type)
-                        self.relationships.add(rel)
+                    # ignore relationships where BET context is only stopwords or other invalid words
+                    if all(x in not_valid for x in text_tokens[sorted_keys[i]+len(e1.parts):sorted_keys[i+1]]):
+                        continue
+
+                    r = Relationship(sentence, before, between, after, e1.string, e2.string, e1_type, e2.type)
+                    self.relationships.append(r)
