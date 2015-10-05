@@ -5,7 +5,6 @@ __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
 
 import codecs
-import re
 import fileinput
 import functools
 import multiprocessing
@@ -14,6 +13,7 @@ import sys
 import os
 import cPickle
 import Queue
+import re
 
 from whoosh.index import open_dir, os
 from whoosh.query import spans
@@ -176,17 +176,27 @@ def process_dbpedia(data, database, file_rel_type):
             e1, rel, e2, p = line.strip().split('>')
             e1 = e1.replace("<http://dbpedia.org/resource/", '')
             e2 = e2.replace("<http://dbpedia.org/resource/", '')
+            e2_parts = e2.split(",_")
+            pairs = list()
+            for part in e2_parts:
+                e1 = e1.replace("_", " ")
+                e1 = re.sub(r'\([^\)]+\)', '', e1)
+                e2 = part.replace("_", " ").strip()
+                pairs.append((e1, e2))
 
         except ValueError:
             print "Error parsing", line
             sys.exit(0)
 
-        # follow the order of the relationships as in the output
+        #follow the order of the relationships as in the output
         #TODO: check order of entities for each rel_type
-        if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt']:
-            database[e2.strip().decode("utf8")].append(e1.strip().decode("utf8"))
-        else:
-            database[e1.strip().decode("utf8")].append(e2.strip().decode("utf8"))
+        for pair in pairs:
+            e1 = pair[0]
+            e2 = pair[1]
+            if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt']:
+                database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
+            else:
+                database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
     fileinput.close()
 
 
@@ -197,16 +207,27 @@ def process_yago(data, database, rel_type):
             e1, rel, e2 = line.strip().split('\t')
             e1 = e1.replace("<", "").replace(">", "")
             e2 = e2.replace("<", "").replace(">", "").strip().replace(".", "")
+            e2_parts = e2.split(",_")
+            pairs = list()
+            for part in e2_parts:
+                e1 = e1.replace("_", " ")
+                e1 = re.sub(r'\([^\)]+\)', '', e1)
+                e2 = part.replace("_", " ").strip()
+                pairs.append((e1, e2))
+
         except ValueError:
             print "Error parsing", line
             sys.exit(0)
 
         # follow the order of the relationships as in the output
         #TODO: check order of entities for each rel_type
-        if rel_type in ['founder', 'affiliation']:
-            database[e2.strip().decode("utf8")].append(e1.strip().decode("utf8"))
-        else:
-            database[e1.strip().decode("utf8")].append(e2.strip().decode("utf8"))
+        for pair in pairs:
+            e1 = pair[0]
+            e2 = pair[1]
+            if rel_type in ['founder', 'affiliation']:
+                database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
+            else:
+                database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
     fileinput.close()
 
 
@@ -219,10 +240,9 @@ def process_freebase(data, database, rel_type):
         except ValueError:
             print "Error parsing", line
             sys.exit(0)
-
         # follow the order of the relationships as in the output
         #TODO: check order of entities for each rel_type
-        database[e1.strip().decode("utf8")].append(e2.strip().decode("utf8"))
+        database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
     fileinput.close()
 
 
@@ -314,9 +334,6 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         f = open("superset_" + e1_type + "_" + e2_type + ".pkl")
         print "\nLoading superset G'", "superset_" + e1_type + "_" + e2_type + ".pkl"
         g_dash_set = cPickle.load(f)
-
-        for r in g_dash_set:
-            print r.e1, r.bet_words, r.e2
         f.close()
 
     # else generate G' and G minus D
@@ -353,8 +370,7 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         cPickle.dump(g_dash_set, f)
         f.close()
 
-    # Estimate G \in D, look for facts in G' that a match a fact in the database
-    # check if already exists for this particular relationship
+    # Estimate G intersection D: look for facts in G' that a match a fact in the database
     if os.path.isfile(rel_type + "_g_intersection_d.pkl") and os.path.isfile(rel_type + "_g_minus_d.pkl"):
         f = open(rel_type + "_g_intersection_d.pkl", "r")
         print "\nLoading G intersected with D", rel_type + "_g_intersection_d.pkl"
@@ -380,12 +396,16 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
         no_matches = [manager.list() for _ in range(num_cpus)]
 
         # Load everything into a shared queue
-        print "Loading data into a queue..."
+        print "Loading data into a queue"
         count = 0
         for r in g_dash_set:
-            if count % 1000 == 0:
-                queue.put(r)
+            queue.put(r)
             count += 1
+            if count % 5000 == 0:
+                sys.stdout.write(".")
+                sys.stdout.flush()
+
+        print
 
         processes = [multiprocessing.Process(target=find_intersection, args=(results[i], no_matches[i], database,
                                                                              queue))
@@ -540,8 +560,8 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                     print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total Matched: ", len(results)
                 """
 
-                t1 = query.Term('sentence', "<"+e1_type+" url="+r.ent1+">")
-                t3 = query.Term('sentence', "<"+e2_type+" url="+r.ent2+">")
+                t1 = query.Term('sentence', "<" + e1_type + ">" + r.e1 + "</" + e1_type + ">")
+                t3 = query.Term('sentence', "<" + e2_type + ">" + r.e2 + "</" + e2_type + ">")
 
                 # Entities proximity query without relational words
                 q1 = spans.SpanNear2([t1, t3], slop=distance, ordered=True, mindist=1)
@@ -558,9 +578,14 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                     s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW,
                                  stopwords)
                     for s_r in s.relationships:
-                        if r.ent1.decode("utf8") == s_r.ent1 and r.ent2.decode("utf8") == s_r.ent2:
-                            unigrams_rel_words = word_tokenize(s_r.between)
-                            bigrams_rel_words = extract_bigrams(s_r.between)
+                        if r.e1.decode("utf8") == s_r.e1 and r.e2.decode("utf8") == s_r.e2:
+                            unigrams_rel_words = r.between
+                            bigrams_rel_words = extract_bigrams(''.join(r.between))
+
+                            print unigrams_rel_words
+                            print bigrams_rel_words
+                            print
+
                             if all(x in not_valid for x in unigrams_rel_words):
                                 hits_without_r += 1
                                 continue
@@ -757,6 +782,7 @@ def find_intersection(results, no_matches, database, queue):
             count += 1
             if count % 500 == 0:
                 print multiprocessing.current_process(), "In Queue", queue.qsize()
+
             if r.e1 in database.keys():
                 if r.e2 in database[r.e1]:
                     results.append(r)
@@ -779,13 +805,8 @@ def process_corpus(queue, g_dash, e1_type, e2_type):
             line = queue.get_nowait()
             s = Sentence(line.strip(), e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords)
             for r in s.relationships:
-                if all(x in not_valid for x in r.between):
-                    continue
-                elif "," in r.between and r.between[0] != ',':
-                    continue
-                else:
-                    g_dash.append(r)
-                    added += 1
+                g_dash.append(r)
+                added += 1
             count += 1
         except Queue.Empty:
             break
@@ -968,9 +989,7 @@ def main():
     print "Arg2 Type:", e2_type
 
     # load relationships into database
-    database = defaultdict(list)
-    #TODO: confirmar as ordens das entidades quando são guardadas em 'database'
-
+    database = defaultdict(set)
     print "\nLoading relationships from Freebase"
     for f in freebase_ground_truth:
         print f.split('/')[-1],
@@ -1012,11 +1031,7 @@ def main():
     # once we have G \in D and |b|, |c| can be derived by: |c| = |G \in D| - |b|
     #  G' = superset of G, cartesian product of all possible entities and relations (i.e., G' = E x R x E)
     print "\nCalculating set C: database facts in the corpus but not extracted by the system"
-    c, g_minus_d = calculate_c(corpus, database, b, e1_type, e2_type, rel_type,
-                               rel_words_unigrams, rel_words_bigrams)
-
-    print c
-
+    c, g_minus_d = calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigrams, rel_words_bigrams)
     assert len(c) > 0
 
     uniq_c = set()
