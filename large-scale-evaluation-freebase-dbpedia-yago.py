@@ -436,7 +436,7 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
             unigrams_bef = r.before
             #unigrams_aft = word_tokenize(r.after)
             unigrams_aft = r.after
-            bigrams_bet = extract_bigrams(''.join(r.between))
+            bigrams_bet = extract_bigrams(' '.join(r.between))
             if any(x in rel_words_unigrams for x in unigrams_bet):
                 filtered.add(r)
                 continue
@@ -466,7 +466,7 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
             unigrams_bef = r.before
             #unigrams_aft = word_tokenize(r.after)
             unigrams_aft = r.after
-            bigrams_bet = extract_bigrams(''.join(r.between))
+            bigrams_bet = extract_bigrams(' '.join(r.between))
             if any(x in rel_words_unigrams for x in unigrams_bet):
                 filtered.add(r)
                 continue
@@ -555,10 +555,8 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
         while True:
             try:
                 r = queue.get_nowait()
-                """
                 if count % 50 == 0:
                     print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total Matched: ", len(results)
-                """
 
                 t1 = query.Term('sentence', "<" + e1_type + ">" + r.e1 + "</" + e1_type + ">")
                 t3 = query.Term('sentence', "<" + e2_type + ">" + r.e2 + "</" + e2_type + ">")
@@ -580,39 +578,52 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                     for s_r in s.relationships:
                         if r.e1.decode("utf8") == s_r.e1 and r.e2.decode("utf8") == s_r.e2:
                             unigrams_rel_words = r.between
-                            bigrams_rel_words = extract_bigrams(''.join(r.between))
-
-                            print unigrams_rel_words
-                            print bigrams_rel_words
-                            print
+                            bigrams_rel_words = extract_bigrams(' '.join(r.between))
 
                             if all(x in not_valid for x in unigrams_rel_words):
                                 hits_without_r += 1
+                                print "INVALID"
+                                print s_r.sentence
+                                print s_r.e1
+                                print s_r.e2
+                                print s_r.between
+                                print "\n"
                                 continue
+
                             elif any(x in rel_words_unigrams for x in unigrams_rel_words):
-                                """
                                 print "UNIGRAMS HIT"
                                 print s_r.sentence
-                                print s_r.ent1
-                                print s_r.ent2
+                                print s_r.e1
+                                print s_r.e2
                                 print s_r.between
                                 print "\n"
-                                """
                                 hits_with_r += 1
+
                             elif any(x in rel_words_bigrams for x in bigrams_rel_words):
-                                """
                                 print "BIGRAMS HIT"
                                 print s_r.sentence
-                                print s_r.ent1
-                                print s_r.ent2
+                                print s_r.e1
+                                print s_r.e2
                                 print s_r.between
                                 print "\n"
-                                """
                                 hits_with_r += 1
                             else:
                                 hits_without_r += 1
 
-                if hits_with_r > 0 and hits_without_r > 0:
+                if hits_with_r > 0 and hits_without_r == 0:
+                    # it can be the case that hits_with_r > 0 and hits_without_r = 0
+                    # i.e.:
+                    #   all the ocurrences of the two entities are with the 'fact_bet_words_tokens' (from the output)
+                    #   this should be considered as positive match
+                    results.append(r)
+                    print "**VALID**:", r.e1, '\t', r.e2
+                    print "hits_without_r ", float(hits_without_r)
+                    print "hits_with_r ", float(hits_with_r)
+                    print r.sentence
+                    print r.bet_words
+                    print
+
+                elif hits_with_r > 0 and hits_without_r > 0:
                     pmi = float(hits_with_r) / float(hits_without_r)
                     if pmi >= PMI:
                         if word_tokenize(s_r.between)[-1] == 'by':
@@ -620,13 +631,11 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                             s_r.ent2 = s_r.ent1
                             s_r.ent1 = tmp
                         results.append(r)
-                        """
-                        print "**ADDED**:", entity1, '\t', entity2
+                        print "**ADDED**:", r.e1, '\t', r.e2
                         print "hits_without_r ", float(hits_without_r)
                         print "hits_with_r ", float(hits_with_r)
                         print "PMI", pmi
                         print
-                        """
                 count += 1
             except Queue.Empty:
                 break
@@ -685,7 +694,6 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     else:
                         bef_tokens = bef_tokens[CONTEXT_WINDOW:]
                         aft_tokens = aft_tokens[:CONTEXT_WINDOW]
-
                         unigrams_bef_words = bef_tokens
                         unigrams_bet_words = bet_tokens
                         unigrams_aft_words = aft_tokens
@@ -1053,7 +1061,7 @@ def main():
 
     uniq_d = set()
     for r in d:
-        uniq_d.add((r.ent1, r.ent2))
+        uniq_d.add((r.e1, r.e2))
 
     print "|a| =", len(a)
     print "|b| =", len(b)
@@ -1067,9 +1075,9 @@ def main():
     f = open(rel_type + "_negative.txt", "w")
     for r in sorted(set(not_found), reverse=True):
         if r.passive_voice is True:
-            f.write('instance : ' + r.ent2 + '\t' + r.ent1 + '\t' + str(r.score) + '\n')
+            f.write('instance : ' + r.e2 + '\t' + r.e1 + '\t' + str(r.score) + '\n')
         else:
-            f.write('instance : ' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
+            f.write('instance : ' + r.e1 + '\t' + r.e2 + '\t' + str(r.score) + '\n')
             f.write('sentence : ' + r.sentence + '\n')
             f.write('bef_words: ' + r.bef_words + '\n')
             f.write('bet_words: ' + r.bet_words + '\n')
@@ -1082,9 +1090,9 @@ def main():
     f = open(rel_type + "_positive.txt", "w")
     for r in sorted(set(a).union(b), reverse=True):
         if r.passive_voice is True:
-            f.write('instance :' + r.ent2 + '\t' + r.ent1 + '\t' + str(r.score) + '\n')
+            f.write('instance :' + r.e2 + '\t' + r.e1 + '\t' + str(r.score) + '\n')
         else:
-            f.write('instance : ' + r.ent1 + '\t' + r.ent2 + '\t' + str(r.score) + '\n')
+            f.write('instance : ' + r.e1 + '\t' + r.e2 + '\t' + str(r.score) + '\n')
             f.write('sentence : ' + r.sentence + '\n')
             f.write('bef_words: ' + r.bef_words + '\n')
             f.write('bet_words: ' + r.bet_words + '\n')
