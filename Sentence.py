@@ -115,7 +115,7 @@ class Sentence:
                 e = EntitySimple(e_string, e_parts, e_type, locations)
                 entities_info.add(e)
 
-            # create an hashtable on which:
+            # create an hashtable:
             # - the key is the starting index in the tokenized sentence of an entity
             # - the value the corresponding Entity instance
             locations = dict()
