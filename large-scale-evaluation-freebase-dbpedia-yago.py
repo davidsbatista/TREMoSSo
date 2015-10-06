@@ -27,12 +27,12 @@ num_cpus = 0
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
-#TODO: mais palavras
+#TODO: adicionar mais palavras
 founder_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofounded', 'founded', 'founders']
 founder_bigrams = ['started by']
 
-acquired_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
-acquired_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 'owned by']
+owns_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
+owns_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 'owned by']
 
 installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office', 'building', 'buildings', 'factory',
                              'plant', 'compund']
@@ -41,8 +41,8 @@ installations_in_bigrams = ['based in', 'located in', 'main office', ' main offi
                             'office in', 'branch in', 'store in', 'firm in', 'factory in', 'plant in', 'head office',
                             'head offices', 'in central', 'in downton', 'outskirts of', 'suburs of', 'branch in']
 
-employment_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer']
-employment_bigrams = []
+affiliation_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer']
+affiliation_bigrams = []
 
 studied_unigrams = ['graduated', 'earned', 'degree']
 studied_bigrams = ['graduated from', 'earned phd', 'studies at', 'studied at', 'student at']
@@ -189,7 +189,6 @@ def process_dbpedia(data, database, file_rel_type):
             sys.exit(0)
 
         #follow the order of the relationships as in the output
-        #TODO: check order of entities for each rel_type
         for pair in pairs:
             e1 = pair[0]
             e2 = pair[1]
@@ -220,7 +219,6 @@ def process_yago(data, database, rel_type):
             sys.exit(0)
 
         # follow the order of the relationships as in the output
-        #TODO: check order of entities for each rel_type
         for pair in pairs:
             e1 = pair[0]
             e2 = pair[1]
@@ -240,9 +238,12 @@ def process_freebase(data, database, rel_type):
         except ValueError:
             print "Error parsing", line
             sys.exit(0)
+
         # follow the order of the relationships as in the output
-        #TODO: check order of entities for each rel_type
-        database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
+        if rel_type in ['founder', 'affiliation']:
+            database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
+        else:
+            database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
     fileinput.close()
 
 
@@ -582,30 +583,36 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
 
                             if all(x in not_valid for x in unigrams_rel_words):
                                 hits_without_r += 1
+                                """
                                 print "INVALID"
                                 print s_r.sentence
                                 print s_r.e1
                                 print s_r.e2
                                 print s_r.between
                                 print "\n"
+                                """
                                 continue
 
                             elif any(x in rel_words_unigrams for x in unigrams_rel_words):
+                                """
                                 print "UNIGRAMS HIT"
                                 print s_r.sentence
                                 print s_r.e1
                                 print s_r.e2
                                 print s_r.between
                                 print "\n"
+                                """
                                 hits_with_r += 1
 
                             elif any(x in rel_words_bigrams for x in bigrams_rel_words):
+                                """
                                 print "BIGRAMS HIT"
                                 print s_r.sentence
                                 print s_r.e1
                                 print s_r.e2
                                 print s_r.between
                                 print "\n"
+                                """
                                 hits_with_r += 1
                             else:
                                 hits_without_r += 1
@@ -613,15 +620,17 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                 if hits_with_r > 0 and hits_without_r == 0:
                     # it can be the case that hits_with_r > 0 and hits_without_r = 0
                     # i.e.:
-                    #   all the ocurrences of the two entities are with the 'fact_bet_words_tokens' (from the output)
+                    #   all the ocurrences of the two entities are valid ocurrences of the relationship
                     #   this should be considered as positive match
                     results.append(r)
+                    """
                     print "**VALID**:", r.e1, '\t', r.e2
                     print "hits_without_r ", float(hits_without_r)
                     print "hits_with_r ", float(hits_with_r)
                     print r.sentence
                     print r.bet_words
                     print
+                    """
 
                 elif hits_with_r > 0 and hits_without_r > 0:
                     pmi = float(hits_with_r) / float(hits_without_r)
@@ -631,11 +640,13 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                             s_r.ent2 = s_r.ent1
                             s_r.ent1 = tmp
                         results.append(r)
+                        """
                         print "**ADDED**:", r.e1, '\t', r.e2
                         print "hits_without_r ", float(hits_without_r)
                         print "hits_with_r ", float(hits_with_r)
                         print "PMI", pmi
                         print
+                        """
                 count += 1
             except Queue.Empty:
                 break
@@ -859,72 +870,16 @@ def main():
 
     # corpus from which the system extracted relationships
     corpus = "/home/dsbatista/gigaword/set_a_matched.txt"
-    #corpus = "/home/dsbatista/gigaword/automatic-evaluation/sentences_test.txt"
 
     # index to be used to estimate proximity PMI
     index = "/home/dsbatista/gigaword/automatic-evaluation/index_full"
 
-    """
-    affiliation                           & PER & ORG
-        DBpedia:        <http://dbpedia.org/ontology/affiliation>
-        YagoFacts.ttl:  <isAffiliatedTo>
-
-
-    founded-by                            & ORG & PER
-        DBpedia:        <http://dbpedia.org/ontology/founder>
-        YagoFacts.ttl:  <created>
-
-
-    installations-in                      & ORG & LOC
-        DBpedia:        <http://dbpedia.org/ontology/location>
-                        <http://dbpedia.org/ontology/headquarter>
-                        <http://dbpedia.org/ontology/locationCity>
-                        <http://dbpedia.org/ontology/locationCountry>
-
-                        testar com esta: <http://dbpedia.org/ontology/locatedInArea> ?
-
-        YagoFacts.ttl:  <isLocatedIn>
-
-    has-shares-of                         & ORG & ORG
-        DBpedia:        <http://dbpedia.org/ontology/subsidiary>
-        YagoFacts.ttl:  <owns>
-
-    located-in                            & LOC & LOC
-        DBpedia:        <http://dbpedia.org/ontology/locatedInArea> # has organisations and locations
-                        <http://dbpedia.org/ontology/country>
-                        <http://dbpedia.org/ontology/capital>       # swap
-                        <http://dbpedia.org/ontology/largestCity>   # swap
-
-                        #TODO:
-                        <http://dbpedia.org/ontology/municipality>
-                        <http://dbpedia.org/ontology/archipelago>
-                        <http://dbpedia.org/ontology/subregion>
-                        <http://dbpedia.org/ontology/federalState>
-                        <http://dbpedia.org/ontology/district>
-                        <http://dbpedia.org/ontology/region>
-                        <http://dbpedia.org/ontology/province>
-                        <http://dbpedia.org/ontology/state>
-                        <http://dbpedia.org/ontology/county>
-                        <http://dbpedia.org/ontology/map>
-                        <http://dbpedia.org/ontology/campus>
-                        <http://dbpedia.org/ontology/garrison>
-                        <http://dbpedia.org/ontology/department>
-
-                        #<http://dbpedia.org/ontology/capitalCountry>
-                        #<http://dbpedia.org/ontology/city>
-                        #<http://dbpedia.org/ontology/location>
-
-        YagoFacts.ttl:  <isLocatedIn>
-
-    study-at                              & PER & ORG
-        DBpedia:         <http://dbpedia.org/ontology/almaMater>
-        YagoFacts.ttl:   <graduatedFrom>
-
-    agrees-with                           & PER & PER
-    disagrees-with                        & PER & PER
-    """
-
+    # directory with files containing relationships from KB
     base_dir = "/home/dsbatista/gigaword/automatic-evaluation/relationships_gold/"
+
+    freebase_ground_truth = None
+    dbpedia_ground_truth = None
+    yago_ground_truth = None
 
     if rel_type == 'has-installations':
         e1_type = "ORG"
@@ -936,15 +891,6 @@ def main():
                                 base_dir+"dbpedia_locationCity.txt", base_dir+"dbpedia_locationCountry.txt"]
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
 
-    elif rel_type == 'studied':
-        e1_type = "PER"
-        e2_type = "ORG"
-        rel_words_unigrams = studied_unigrams
-        rel_words_bigrams = studied_bigrams
-        freebase_ground_truth = []
-        dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
-        yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
-
     elif rel_type == 'founder':
         e1_type = "ORG"
         e2_type = "PER"
@@ -954,14 +900,32 @@ def main():
         dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
         yago_ground_truth = [base_dir+"yago_created.txt"]
 
-    elif rel_type == 'has-shares':
+    elif rel_type == 'owns':
         e1_type = "ORG"
         e2_type = "ORG"
-        rel_words_unigrams = acquired_unigrams
-        rel_words_bigrams = acquired_unigrams
+        rel_words_unigrams = owns_unigrams
+        rel_words_bigrams = owns_unigrams
         freebase_ground_truth = [base_dir+"freebase_acquired.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_subsidiary.txt"]
         yago_ground_truth = [base_dir+"yago_owns.txt"]
+
+    elif rel_type == 'affiliation':
+        e1_type = "ORG"
+        e2_type = "PER"
+        rel_words_unigrams = affiliation_unigrams
+        rel_words_bigrams = affiliation_bigrams
+        freebase_ground_truth = [base_dir+"freebase_employment.txt", base_dir+"freebase_governance.txt",
+                                 base_dir+"freebase_leader_of.txt"]
+        yago_ground_truth = [base_dir+"yago_isAffiliatedTo.txt", base_dir+"yago_worksAt.txt"]
+
+    elif rel_type == 'studied':
+        e1_type = "PER"
+        e2_type = "ORG"
+        rel_words_unigrams = studied_unigrams
+        rel_words_bigrams = studied_bigrams
+        freebase_ground_truth = []
+        dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
+        yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
 
     elif rel_type == 'located-in':
         e1_type = "LOC"
@@ -969,24 +933,26 @@ def main():
         rel_words_unigrams = located_in_unigrams
         rel_words_bigrams = located_in_bigrams
         freebase_ground_truth = [base_dir+"freebase_location_citytown.txt"]
-        dbpedia_ground_truth = [base_dir+"dbpedia_locatedInArea.txt"]
+        dbpedia_ground_truth = [base_dir+"dbpedia_country.txt", base_dir+"dbpedia_capital.txt",
+                                base_dir+"dbpedia_largestCity.txt"]
+
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
 
-    elif rel_type == 'affiliation':
-        e1_type = "ORG"
+    elif rel_type == 'spouse':
+        e1_type = "PER"
         e2_type = "PER"
-        rel_words_unigrams = employment_unigrams
-        rel_words_bigrams = employment_bigrams
-        freebase_ground_truth = [base_dir+"freebase_employment.txt", base_dir+"freebase_governance.txt",
-                                 base_dir+"freebase_leader_of.txt"]
-        dbpedia_ground_truth = [base_dir+"dbpedia_affiliation.txt"]
-        yago_ground_truth = [base_dir+"yago_affiliation.txt", base_dir+"yago_worksAt.txt"]
+        #TODO: words e outras KB
+        #rel_words_unigrams = spouse_unigrams
+        #rel_words_bigrams = spouse_bigrams
+        freebase_ground_truth = [base_dir+"freebase_married_to.txt", base_dir+"freebase_spouse_partner.txt"]
 
-        #TODO: new relationships
-        #freebase_married_to.txt
-        #freebase_sibling.txt
-        #freebase_spouse_partner.txt
-        #freebase_venture_investment.txt
+    elif rel_type == 'invested-in':
+        e1_type = "ORG"
+        e2_type = "ORG"
+        #TODO: words e outras KB
+        #rel_words_unigrams = invested_unigrams
+        #rel_words_bigrams = invested_bigrams
+        freebase_ground_truth = [base_dir+"freebase_venture_investment.txt"]
 
     else:
         print "Invalid relationship type", rel_type
@@ -998,6 +964,7 @@ def main():
 
     # load relationships into database
     database = defaultdict(set)
+
     print "\nLoading relationships from Freebase"
     for f in freebase_ground_truth:
         print f.split('/')[-1],
@@ -1005,10 +972,11 @@ def main():
         print
 
     print "\nLoading relationships from DBpedia"
-    for f in dbpedia_ground_truth:
-        print f.split('/')[-1],
-        process_dbpedia(dbpedia_ground_truth, database, f.split('/')[-1])
-        print
+    if dbpedia_ground_truth is not None:
+        for f in dbpedia_ground_truth:
+            print f.split('/')[-1],
+            process_dbpedia(dbpedia_ground_truth, database, f.split('/')[-1])
+            print
 
     print "\nLoading relationships from Yago"
     for f in yago_ground_truth:
