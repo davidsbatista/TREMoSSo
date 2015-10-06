@@ -22,7 +22,7 @@ class LocalitySensitiveHashing:
     bands = []
     minhash_instances = None
 
-    def __init__(self, n_bands, n_sigs, knn, use_redis):
+    def __init__(self, n_bands, n_sigs, knn):
         if (n_sigs % n_bands) != 0:
             print "Error! Number of hash signatures must be a multiple of number of bands"
             sys.exit(0)
