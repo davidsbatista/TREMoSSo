@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import StringIO
 
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
 
+import StringIO
 import re
 import os
 import sys
@@ -133,36 +133,33 @@ def load_training_relationships(data_file, tagger, reverb):
             after = after[:CONTEXT_WINDOW]
             patterns = reverb.extract_reverb_patterns_tagged_ptb(between_pos)
 
-            print e1, e2
-            print sentence
+            #print e1, e2
+            #print sentence
 
-            features = StringIO.StringIO()
+            shingles = StringIO.StringIO()
             #TODO: escrever o tipo de relação
             #f_features.write(rel_type + '\t')
 
             reverb_pattern = '_'.join([t[0] for t in patterns])
             if len(reverb_pattern) > 0:
                 reverb_pattern += '_RVB'
-                f_features.write(reverb_pattern.encode("utf8") + ' ')
+                shingles.write(reverb_pattern.encode("utf8") + ' ')
 
             bef_grams = extract_ngrams(' '.join(before), "BEF")
             bet_grams = extract_ngrams(' '.join(between), "BET")
             aft_grams = extract_ngrams(' '.join(after), "AFT")
-            # TODO: adicionar os grams a f_features
 
-            """
-            for shingle in shingles:
-                f_features.write(shingle.encode("utf8") + ' ')
-            f_features.write('\n')
+            for shingle in bef_grams, bet_grams, aft_grams:
+                shingles.write(shingle.encode("utf8") + ' ')
 
             # calculate min-hash sigs
-            sigs = MinHash.signature(shingles, N_SIGS)
+            sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
+            """
             rel.sigs = sigs
             rel.identifier = rel_id
             relationships.append(rel)
             """
             rel_id += 1
-
 
     f_sentences.close()
     f_features.close()
