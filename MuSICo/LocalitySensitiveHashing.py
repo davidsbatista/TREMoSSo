@@ -57,7 +57,6 @@ class LocalitySensitiveHashing:
 
         for i in range(0, len(chunked)):
             sorted_chunk = numpy.sort(chunked[i])
-
             # TODO, redis_i, ..., redis_n
             # .set(tuple(sorted_chunk)
             if self.bands[i].get(tuple(sorted_chunk)):
@@ -80,7 +79,7 @@ class LocalitySensitiveHashing:
                 # sum() of the array of boolean gives the number of True, i.e., ones
                 #   - Jaccardi is number of equal signatures (False) over the total number of signatures
                 candidate_sigs = pickle.loads(candidate_sigs)
-                score = 1-numpy.logical_xor(sigs, candidate_sigs).sum() / float(self.n_sigs)
+                score = 1 - logical_xor(sigs, candidate_sigs).sum() / float(self.n_sigs)
                 scores.append((rel_type, rel_id, score))
 
         if len(scores) == 0:
