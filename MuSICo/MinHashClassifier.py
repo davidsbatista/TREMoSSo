@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from MuSICo.FeatureExtractor import FeatureExtractor
 
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
@@ -9,14 +10,13 @@ import re
 import os
 import sys
 import codecs
-import pickle
 import MinHash
 
 from nltk.data import load
 from nltk import word_tokenize, ngrams
 
 from ReVerb import Reverb
-from Sentence import Sentence, Relationship
+from Sentence import Sentence, find_locations
 from LocalitySensitiveHashing import LocalitySensitiveHashing
 
 
@@ -37,30 +37,12 @@ def extract_ngrams(text, context):
     return tmp.getvalue()
 
 
-def tokenize_entity(entity):
-    parts = word_tokenize(entity)
-    if parts[-1] == '.':
-        replace = parts[-2] + parts[-1]
-        del parts[-1]
-        del parts[-1]
-        parts.append(replace)
-    return parts
-
-
-def find_locations(entity_string, text_tokens):
-    locations = []
-    e_parts = tokenize_entity(entity_string)
-    for i in range(len(text_tokens)):
-        if text_tokens[i:i + len(e_parts)] == e_parts:
-            locations.append(i)
-    return e_parts, locations
-
-
 def classify_sentences(data_file, lsh):
     #TODO: isto também pode ser paralelizado
     print "Loading PoS tagger"
     tagger = load('taggers/maxent_treebank_pos_tagger/english.pickle')
     reverb = Reverb()
+    fe = FeatureExtractor(tagger, reverb, N_GRAMS_SIZE)
     count = 0
     f_sentences = codecs.open(data_file, encoding='utf-8')
     for line in f_sentences:
@@ -118,11 +100,14 @@ def classify_sentences(data_file, lsh):
 
 def load_training_relationships(data_file, rel_type, tagger, reverb, rel_id):
     relationships = []
-    regex_clean_simple = re.compile('</?[A-Z]+>', re.U)
     f_sentences = codecs.open(data_file, encoding='utf-8')
     f_features = open('features.txt', 'w')
 
-    #TODO: parallelize
+    fe = FeatureExtractor()
+    print "Loading PoS tagger"
+    tagger = load('taggers/maxent_treebank_pos_tagger/english.pickle')
+    reverb = Reverb()
+
     for line in f_sentences:
         if line.startswith("instance"):
             try:
@@ -134,53 +119,18 @@ def load_training_relationships(data_file, rel_type, tagger, reverb, rel_id):
 
         if line.startswith("sentence") and e1 is not None and e2 is not None:
             sentence = line.split("sentence : ")[1]
-            sentence_no_tags = re.sub(regex_clean_simple, "", sentence)
-            text_tokens = word_tokenize(sentence_no_tags)
-            text_tagged = tagger.tag(text_tokens)
-            assert len(text_tagged) == len(text_tokens)
 
-            e1_info = find_locations(e1, text_tokens)
-            e2_info = find_locations(e2, text_tokens)
-            e1_b = e1_info[1][0]
-            e2_b = e2_info[1][0]
-            if e1_b >= e2_b:
-                e1_b = e1_info[1][0]
-                e2_b = e2_info[1][1]
-            assert e1_b < e2_b
-
-            distance = e2_b - e1_b
-            #TODO: garantir isto
-            #assert MAX_TOKENS >= distance >= MIN_TOKENS
-            if distance > MAX_TOKENS or distance < MIN_TOKENS:
-                continue
-
-            before = text_tokens[:e1_b]
-            before = before[-CONTEXT_WINDOW:]
-            between_pos = text_tagged[e1_b+len(e1_info[0]):e2_b]
-            between = text_tokens[e1_b+len(e1_info[0]):e2_b]
-            after = text_tokens[e2_b+len(e2_info[0]):]
-            after = after[:CONTEXT_WINDOW]
-            patterns = reverb.extract_reverb_patterns_tagged_ptb(between_pos)
-
-            shingles = StringIO.StringIO()
-            reverb_pattern = '_'.join([t[0] for t in patterns])
-            if len(reverb_pattern) > 0:
-                #TODO: testar a passive voice e usar como feature
-                reverb_pattern += '_RVB'
-                shingles.write(reverb_pattern.encode("utf8") + ' ')
-
-            bef_grams = extract_ngrams(' '.join(before), "BEF")
-            bet_grams = extract_ngrams(' '.join(between), "BET")
-            aft_grams = extract_ngrams(' '.join(after), "AFT")
-
-            for shingle in bef_grams, bet_grams, aft_grams:
-                shingles.write(shingle.encode("utf8") + ' ')
+            # extract features
+            shingles = fe.extract_index(sentence, e1, e2)
 
             # calculate min-hash sigs
             sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
             relationships.append((rel_type, rel_id, sigs))
             if rel_id % 100 == 0:
                 sys.stdout.write(".")
+            rel_id += 1
+
+
             rel_id += 1
 
     f_sentences.close()
@@ -195,7 +145,7 @@ def load_shingles(shingles_file):
     File format is: relaltionship_type \t shingle1 shingle2 shingle3 ... shingle_n
     """
     relationships = []
-    rel_identifier = 0
+    rel_id = 0
     f_shingles = codecs.open(shingles_file, encoding='utf-8')
 
     for line in f_shingles:
@@ -205,12 +155,9 @@ def load_shingles(shingles_file):
 
         # calculate min-hash sigs
         sigs = MinHash.signature(shingles, N_SIGS)
-
-        rel = Relationship(None, None, None, None, None, None, None, None, rel_type, rel_identifier)
-        rel.sigs = sigs
-        rel.identifier = rel_identifier
-        relationships.append(rel)
-        rel_identifier += 1
+        rel_id = None
+        rel_type = None
+        rel_id += 1
     
     f_shingles.close()
 
