@@ -1048,6 +1048,12 @@ def main():
     for r in sorted(set(not_found), reverse=True):
         if r.passive_voice is True:
             f.write('instance : ' + r.e2 + '\t' + r.e1 + '\t' + str(r.score) + '\n')
+            f.write('sentence : ' + r.sentence + '\n')
+            f.write('bef_words: ' + r.bef_words + '\n')
+            f.write('bet_words: ' + r.bet_words + '\n')
+            f.write('aft_words: ' + r.aft_words + '\n')
+            f.write('passive voice: ' + str(r.passive_voice) + '\n')
+            f.write('\n')
         else:
             f.write('instance : ' + r.e1 + '\t' + r.e2 + '\t' + str(r.score) + '\n')
             f.write('sentence : ' + r.sentence + '\n')
@@ -1062,7 +1068,13 @@ def main():
     f = open(rel_type + "_positive.txt", "w")
     for r in sorted(set(a).union(b), reverse=True):
         if r.passive_voice is True:
-            f.write('instance :' + r.e2 + '\t' + r.e1 + '\t' + str(r.score) + '\n')
+            f.write('instance : ' + r.e2 + '\t' + r.e1 + '\t' + str(r.score) + '\n')
+            f.write('sentence : ' + r.sentence + '\n')
+            f.write('bef_words: ' + r.bef_words + '\n')
+            f.write('bet_words: ' + r.bet_words + '\n')
+            f.write('aft_words: ' + r.aft_words + '\n')
+            f.write('passive voice: ' + str(r.passive_voice) + '\n')
+            f.write('\n')
         else:
             f.write('instance : ' + r.e1 + '\t' + r.e2 + '\t' + str(r.score) + '\n')
             f.write('sentence : ' + r.sentence + '\n')
