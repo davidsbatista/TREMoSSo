@@ -37,34 +37,27 @@ class LocalitySensitiveHashing:
                 self.bands.append(conn)
             self.minhash_instances = redis.StrictRedis(host='localhost', port=6379, db=n_bands+1)
 
-    def create(self):
-        for i in range(0, self.n_bands):
-            self.bands.append(dict())
-
-    def index(self, relationship):
+    def index(self, rel):
         # generates a list of equaly sized chunks (arrays) from the min-hash array
-        chunked = [s for s in self.chunks(relationship.sigs, self.sigs_per_band)]
+        # (rel_type, rel_id, sigs)
+        chunked = [s for s in self.chunks(rel[2], self.sigs_per_band)]
         for i in range(0, len(chunked)):
             sorted_chunk = numpy.sort(chunked[i])
-            self.bands[i].set(tuple(sorted_chunk), (relationship.rel_type, relationship.identifier))
+            self.bands[i].set(tuple(sorted_chunk), (rel[0], rel[1]))
 
         # save the minh-hash signatures of the relationship
         # allows for real Jaccardi calculation in classication
-        sigs_pickled = pickle.dumps(relationship.sigs)
-        self.minhash_instances.set(relationship.identifier, sigs_pickled)
+        sigs_pickled = pickle.dumps(rel[2])
+        self.minhash_instances.set(rel[1], sigs_pickled)
 
-    @staticmethod
-    def chunks(l, n):
-        for i in xrange(0, len(l), n):
-            yield l[i:i + n]
-
-    def classify(self, relationship):
+    def classify(self, sigs):
         # generates a list of equaly sized chunks (arrays) from the min-hash array
-        chunked = [s for s in self.chunks(relationship.sigs, self.sigs_per_band)]
+        chunked = [s for s in self.chunks(sigs, self.sigs_per_band)]
         candidates = defaultdict(list)
 
         for i in range(0, len(chunked)):
             sorted_chunk = numpy.sort(chunked[i])
+
             # TODO, redis_i, ..., redis_n
             # .set(tuple(sorted_chunk)
             if self.bands[i].get(tuple(sorted_chunk)):
@@ -84,14 +77,14 @@ class LocalitySensitiveHashing:
                 # logical XOR between two array of min-hash sigs:
                 #   - gives False if two elements are equal, True if two elements are different
                 #   - return array of boolean values (False,True)
-                # .sum() of the array of boolean gives the number of True, i.e., ones
+                # sum() of the array of boolean gives the number of True, i.e., ones
                 #   - Jaccardi is number of equal signatures (False) over the total number of signatures
-                sigs = pickle.loads(candidate_sigs)
-                score = 1-numpy.logical_xor(relationship.sigs, sigs).sum() / float(self.n_sigs)
+                candidate_sigs = pickle.loads(candidate_sigs)
+                score = 1-numpy.logical_xor(sigs, candidate_sigs).sum() / float(self.n_sigs)
                 scores.append((rel_type, rel_id, score))
 
         if len(scores) == 0:
-            return "no candidates"
+            return None
 
         else:
             rel_sorted = sorted(scores, key=itemgetter(2), reverse=True)
@@ -107,3 +100,14 @@ class LocalitySensitiveHashing:
 
             output_sorted = sorted(output, key=itemgetter(1), reverse=True)
             return output_sorted[0]
+
+    def create(self):
+        for i in range(0, self.n_bands):
+            self.bands.append(dict())
+
+    @staticmethod
+    def chunks(l, n):
+        for i in xrange(0, len(l), n):
+            yield l[i:i + n]
+
+
