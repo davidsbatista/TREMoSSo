@@ -51,6 +51,8 @@ located_in_unigrams = ['capital', 'suburb', 'city', 'island', 'region']
 located_in_bigrams = ['capital of', 'suburb of', 'city of', 'island', 'region of', 'in southern', 'in northern',
                       'northwest of', 'town in']
 
+spouse_unigrams = ['married', 'wife']
+spouse_bigrams = ['married to', 'his wife']
 
 # tokens between entities which do not represent relationships
 bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
@@ -942,8 +944,10 @@ def main():
         e1_type = "PER"
         e2_type = "PER"
         #TODO: words e outras KB
-        #rel_words_unigrams = spouse_unigrams
-        #rel_words_bigrams = spouse_bigrams
+        rel_words_unigrams = spouse_unigrams
+        rel_words_bigrams = spouse_bigrams
+        dbpedia_ground_truth = []
+        yago_ground_truth = []
         freebase_ground_truth = [base_dir+"freebase_married_to.txt", base_dir+"freebase_spouse_partner.txt"]
 
     elif rel_type == 'invested-in':
