@@ -147,5 +147,5 @@ class Sentence:
                     if all(x in not_valid for x in text_tokens[sorted_keys[i]+len(e1.parts):sorted_keys[i+1]]):
                         continue
 
-                    r = Relationship(sentence, before, between, after, e1.string, e2.string, e1_type, e2.type)
+                    r = Relationship(sentence, before, between, after, e1.string, e2.string, e1.type, e2.type)
                     self.relationships.append(r)
