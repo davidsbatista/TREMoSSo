@@ -72,6 +72,7 @@ def load_training_relationships(data_file, rel_type, rel_id):
             relationships.append((rel_type, rel_id, sigs))
             if rel_id % 100 == 0:
                 sys.stdout.write(".")
+            f_features.write(str(rel_id)+'\t'+shingles.getvalue()+'\n')
             rel_id += 1
     f_sentences.close()
     f_features.close()
