@@ -1,27 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from MuSICo.FeatureExtractor import FeatureExtractor
 
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
 
-import StringIO
-import re
 import os
 import sys
 import codecs
 import MinHash
 
-from nltk.data import load
-from nltk import word_tokenize, ngrams
-
-from ReVerb import Reverb
-from Sentence import Sentence, find_locations
+from FeatureExtractor import FeatureExtractor
 from LocalitySensitiveHashing import LocalitySensitiveHashing
 
-
-N_BANDS = 100
-N_SIGS = 800
+N_BANDS = 50
+N_SIGS = 600
 KNN = 7
 CONTEXT_WINDOW = 3
 N_GRAMS_SIZE = 4
@@ -29,67 +21,28 @@ MAX_TOKENS = 6
 MIN_TOKENS = 1
 
 
-def extract_ngrams(text, context):
-    tmp = StringIO.StringIO()
-    chrs = ['_' if c == ' ' else c for c in text]
-    for g in ngrams(chrs, N_GRAMS_SIZE):
-        tmp.write(''.join(g) + '_' + context + ' ')
-    return tmp.getvalue()
-
-
 def classify_sentences(data_file, lsh):
     #TODO: isto também pode ser paralelizado
-    print "Loading PoS tagger"
-    tagger = load('taggers/maxent_treebank_pos_tagger/english.pickle')
-    reverb = Reverb()
-    fe = FeatureExtractor(tagger, reverb, N_GRAMS_SIZE)
     count = 0
+    fe = FeatureExtractor()
     f_sentences = codecs.open(data_file, encoding='utf-8')
     for line in f_sentences:
         if line.startswith("#"):
             continue
         else:
-            # generate relationship
-            sentence = Sentence(line.strip(), MAX_TOKENS,  MIN_TOKENS, CONTEXT_WINDOW, tagger)
-            for rel in sentence.relationships:
-                shingles = StringIO.StringIO()
-                """
-                print rel.sentence
-                print rel.e1, '\t', rel.e2
-                print rel.before
-                print rel.between
-                print rel.after
-                """
-                reverb_pattern = reverb.extract_reverb_patterns_tagged_ptb(rel.between)
-                bet_text = ' '.join([t[0] for t in reverb_pattern])
+            # extract features
+            rel, shingles = fe.process_classify(line)
 
-                # extract features
-                if len(reverb_pattern) > 0:
-                    passive_voice = reverb.detect_passive_voice(reverb_pattern)
-                    #print reverb_pattern
-                    #print passive_voice
-                    #TODO: usar passive voice como feature nos shingles
-                    reverb_pattern = '_'.join([t[0] for t in reverb_pattern])
-                    reverb_pattern += '_RVB'
-                    shingles.write(reverb_pattern.encode("utf8") + ' ')
+            # calculate min-hash sigs
+            sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
 
-                bef_grams = extract_ngrams(' '.join(rel.before), "BEF")
-                bet_grams = extract_ngrams(bet_text, "BET")
-                aft_grams = extract_ngrams(' '.join(rel.after), "AFT")
-
-                for shingle in bef_grams, bet_grams, aft_grams:
-                    shingles.write(shingle.encode("utf8") + ' ')
-
-                # calculate min-hash sigs
-                sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
-
-                # find closest neighbours
-                types = lsh.classify(sigs)
-                if types is not None:
-                    print rel.e1, '\t', rel.e2
-                    print rel.sentence.encode("utf8")
-                    print types.encode("utf8")
-                    print
+            # find closest neighbours
+            types = lsh.classify(sigs)
+            if types is not None:
+                print rel.e1, rel.e2
+                print rel.sentence.encode("utf8")
+                print types.encode("utf8")
+                print
 
         count += 1
         if count % 100 == 0:
@@ -98,16 +51,11 @@ def classify_sentences(data_file, lsh):
     f_sentences.close()
 
 
-def load_training_relationships(data_file, rel_type, tagger, reverb, rel_id):
+def load_training_relationships(data_file, rel_type, rel_id):
     relationships = []
     f_sentences = codecs.open(data_file, encoding='utf-8')
     f_features = open('features.txt', 'w')
-
     fe = FeatureExtractor()
-    print "Loading PoS tagger"
-    tagger = load('taggers/maxent_treebank_pos_tagger/english.pickle')
-    reverb = Reverb()
-
     for line in f_sentences:
         if line.startswith("instance"):
             try:
@@ -116,26 +64,17 @@ def load_training_relationships(data_file, rel_type, tagger, reverb, rel_id):
                 print e
                 print line
                 sys.exit(-1)
-
         if line.startswith("sentence") and e1 is not None and e2 is not None:
             sentence = line.split("sentence : ")[1]
-
-            # extract features
-            shingles = fe.extract_index(sentence, e1, e2)
-
-            # calculate min-hash sigs
+            # extract features and calculate min-hash sigs
+            shingles = fe.process_index(sentence, e1, e2)
             sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
             relationships.append((rel_type, rel_id, sigs))
             if rel_id % 100 == 0:
                 sys.stdout.write(".")
             rel_id += 1
-
-
-            rel_id += 1
-
     f_sentences.close()
     f_features.close()
-
     return rel_id, relationships
 
 
@@ -204,23 +143,18 @@ def main():
         # load sentences, extract features, calculate min-hash sigs, index in bands
         else:
             #TODO: parallelize
-            print "Loading PoS tagger"
-            tagger = load('taggers/maxent_treebank_pos_tagger/english.pickle')
-            reverb = Reverb()
             rel_id = 0
             print "Extracting features from training data and calculating min-hash sigs\n"
+            print "MinHash Signatures : ", N_SIGS
+            print "Bands              : ", N_BANDS
             for f in os.listdir(sys.argv[2]):
                 current_file = os.path.join(sys.argv[2], f)
                 rel_type = f.split("_")[0]
-                print current_file, rel_type
-                rel_id, relationships = load_training_relationships(current_file, rel_type, tagger, reverb, rel_id)
-                print "\n"
-                print "Indexing ", len(relationships), "relationships"
-                print "MinHash Signatures : ", N_SIGS
-                print "Bands              : ", N_BANDS
-                print
+                print "\n"+current_file, rel_type
+                rel_id, relationships = load_training_relationships(current_file, rel_type, rel_id)
                 lsh = LocalitySensitiveHashing(N_BANDS, N_SIGS, KNN)
                 lsh.create()
+                print "Indexing ", len(relationships), "relationships"
                 for r in relationships:
                     lsh.index(r)
 

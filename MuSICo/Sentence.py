@@ -66,13 +66,13 @@ class Relationship:
             return False
 
     def __hash__(self):
-        return hash(self.e1) ^ hash(self.e2) ^ hash(''.join(self.before)) ^ hash(''.join(self.between))\
-               ^ hash(''.join(self.after))
+        return hash(self.e1) ^ hash(self.e2) ^ hash(''.join(self.before)) ^ hash(''.join(self.between)) ^ \
+               hash(''.join(self.after))
 
 
 class Sentence:
 
-    def __init__(self, sentence, max_tokens, min_tokens, window_size, pos_tagger=None, config=None):
+    def __init__(self, sentence, max_tokens, min_tokens, window_size, pos_tagger=None):
         self.relationships = list()
         self.tagged_text = None
 
@@ -125,8 +125,7 @@ class Sentence:
 
                     # run PoS-tagger over the sentence only onces
                     if self.tagged_text is None:
-                        # split text into tokens and tag them using NLTK's default English tagger
-                        # POS_TAGGER = 'taggers/maxent_treebank_pos_tagger/english.pickle'
+                        # split text into tokens and tag them
                         self.tagged_text = pos_tagger.tag(text_tokens)
 
                     before = text_tokens[:sorted_keys[i]]
