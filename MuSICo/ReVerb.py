@@ -134,8 +134,8 @@ class Reverb(object):
         determiner = ['DT', 'EX', 'PDT', 'WDT']
         adp = ['IN', 'IN|RP']
 
-        # TODO: detect negations
-        # ('rejected', 'VBD'), ('a', 'DT'), ('takeover', 'NN')
+        #TODO: detect negation detection before verb
+        #negations = ["not", "neither", "nobody", "no", "none", "nor", "nothing", "nowhere", "never"]
 
         while i <= limit:
             tmp = StringIO.StringIO()
