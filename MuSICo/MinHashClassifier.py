@@ -154,7 +154,7 @@ def main():
                 rel_id, relationships = load_training_relationships(current_file, rel_type, rel_id)
                 lsh = LocalitySensitiveHashing(N_BANDS, N_SIGS, KNN)
                 lsh.create()
-                print "Indexing ", len(relationships), "relationships"
+                print "\nIndexing ", len(relationships), "relationships"
                 for r in relationships:
                     lsh.index(r)
 
