@@ -30,6 +30,9 @@ class FeatureExtractor:
 
     def extract_features(self, after, before, between, between_pos):
         shingles = StringIO.StringIO()
+
+        # relational patterns corresponding to: a verb, followed by nouns, adjectives, or adverbs,
+        # and ending with a preposition;
         reverb_pattern = self.reverb.extract_reverb_patterns_tagged_ptb(between_pos)
         if len(reverb_pattern) > 0:
             passive_voice = self.reverb.detect_passive_voice(reverb_pattern)
@@ -51,6 +54,23 @@ class FeatureExtractor:
 
             pattern_normalized += 'RVB_NORM'
             shingles.write(pattern_normalized.encode("utf8").strip() + ' ')
+
+        # print between_pos
+
+        # all verbs (except aux) in between
+
+        # verb forms in the past participle tense;
+        """
+        VB	Verb, base form
+        28.	VBD	Verb, past tense
+        29.	VBG	Verb, gerund or present participle
+        30.	VBN	Verb, past participle
+        31.	VBP	Verb, non-3rd person singular present
+        32.	VBZ	Verb, 3rd person singular present
+        """
+        # prepositions;
+
+        # infinitive forms of verbs, except auxiliary verbs;
 
         #nouns from the BET context
         for t in between_pos:
