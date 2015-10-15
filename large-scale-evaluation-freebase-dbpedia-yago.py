@@ -728,7 +728,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                             #print "****HIT**** 6"
                             hits_with_r += 1
 
-                        elif len(set(rel_words_bigrams).intersection(set(bigrams_rel_words)))>0:
+                        elif len(set(rel_words_bigrams).intersection(set(bigrams_rel_words))) > 0:
                             #print "****HIT**** 7"
                             hits_with_r += 1
                         else:
@@ -854,7 +854,7 @@ def main():
 
     if len(sys.argv) == 1:
         print "No arguments"
-        print "Use: evaluation.py threshold system_output rel_type database"
+        print "Use: evaluation.py threshold system_output rel_type #CPUs"
         print "\n"
         sys.exit(0)
 
