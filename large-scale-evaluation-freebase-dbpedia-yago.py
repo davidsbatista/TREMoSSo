@@ -41,7 +41,7 @@ installations_in_bigrams = ['based in', 'located in', 'main office', ' main offi
                             'office in', 'branch in', 'store in', 'firm in', 'factory in', 'plant in', 'head office',
                             'head offices', 'in central', 'in downton', 'outskirts of', 'suburs of', 'branch in']
 
-affiliation_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer']
+affiliation_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer', 'president', 'head']
 affiliation_bigrams = []
 
 studied_unigrams = ['graduated', 'earned', 'degree']
@@ -108,9 +108,9 @@ class ExtractedFact(object):
             return False
 
 
-# ##################################
+####################################
 # Misc., Utils, parsing text files #
-# ##################################
+####################################
 
 def timecall(f):
     @functools.wraps(f)
@@ -585,36 +585,30 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
 
                             if all(x in not_valid for x in unigrams_rel_words):
                                 hits_without_r += 1
-                                """
                                 print "INVALID"
                                 print s_r.sentence
                                 print s_r.e1
                                 print s_r.e2
                                 print s_r.between
                                 print "\n"
-                                """
                                 continue
 
                             elif any(x in rel_words_unigrams for x in unigrams_rel_words):
-                                """
                                 print "UNIGRAMS HIT"
                                 print s_r.sentence
                                 print s_r.e1
                                 print s_r.e2
                                 print s_r.between
                                 print "\n"
-                                """
                                 hits_with_r += 1
 
                             elif any(x in rel_words_bigrams for x in bigrams_rel_words):
-                                """
                                 print "BIGRAMS HIT"
                                 print s_r.sentence
                                 print s_r.e1
                                 print s_r.e2
                                 print s_r.between
                                 print "\n"
-                                """
                                 hits_with_r += 1
                             else:
                                 hits_without_r += 1
@@ -625,14 +619,12 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                     #   all the ocurrences of the two entities are valid ocurrences of the relationship
                     #   this should be considered as positive match
                     results.append(r)
-                    """
                     print "**VALID**:", r.e1, '\t', r.e2
                     print "hits_without_r ", float(hits_without_r)
                     print "hits_with_r ", float(hits_with_r)
                     print r.sentence
                     print r.bet_words
                     print
-                    """
 
                 elif hits_with_r > 0 and hits_without_r > 0:
                     pmi = float(hits_with_r) / float(hits_without_r)
@@ -657,15 +649,15 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
 def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_words_unigrams, rel_words_bigrams):
     idx = open_dir(index)
     count = 0
-    q_limit = 500
+    q_limit = 50000
     with idx.searcher() as searcher:
         while True:
             try:
                 r = queue.get_nowait()
                 count += 1
                 if count % 50 == 0:
-                    sys.stdout.write(multiprocessing.current_process()+" To Process: " +
-                                     str(queue.qsize())+" Correct found: "+str(len(results)))
+                    sys.stdout.write(str(multiprocessing.current_process())+" To Process: "+str(queue.qsize()) +
+                                     " Correct found: "+str(len(results))+'\n')
                     sys.stdout.flush()
 
                 # if its not in the database calculate the PMI
@@ -680,12 +672,11 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
 
                 # Entities proximity considering relational words
                 # From the results above count how many contain a relational word
-                #print entity1, '\t', entity2, len(hits), "\n"
-
                 hits_with_r = 0
-                hits_without_r = 0
+                discarded = 0
                 fact_bet_words_tokens = word_tokenize(r.bet_words)
 
+                #print entity1, '\t', entity2, len(hits), "\n"
                 #print "fact words", fact_bet_words_tokens
 
                 for s in hits:
@@ -697,35 +688,36 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     bef = sentence[:start_e1]
                     aft = sentence[end_e2:]
                     bet = sentence[end_e1:start_e2]
-                    bef_tokens = word_tokenize(bef)
                     bet_tokens = word_tokenize(bet)
+                    bef_tokens = word_tokenize(bef)
                     aft_tokens = word_tokenize(aft)
 
                     if not (MIN_TOKENS_AWAY <= len(bet_tokens) <= MAX_TOKENS_AWAY):
+                        discarded += 1
                         continue
 
                     else:
-                        bef_tokens = bef_tokens[CONTEXT_WINDOW:]
-                        aft_tokens = aft_tokens[:CONTEXT_WINDOW]
-                        unigrams_bef_words = bef_tokens
+                        #bef_tokens = bef_tokens[CONTEXT_WINDOW:]
+                        #aft_tokens = aft_tokens[:CONTEXT_WINDOW]
+                        #unigrams_bef_words = bef_tokens
+                        #unigrams_aft_words = aft_tokens
                         unigrams_bet_words = bet_tokens
-                        unigrams_aft_words = aft_tokens
                         bigrams_rel_words = extract_bigrams(bet)
 
-                        if fact_bet_words_tokens == rel_words_unigrams:
-                            #print "****HIT**** 2"
+                        """
+                        print sentence
+                        print unigrams_bet_words
+                        print bigrams_rel_words
+                        print
+                        """
+
+                        if fact_bet_words_tokens == unigrams_bet_words:
+                            #print "****HIT**** 1"
                             hits_with_r += 1
 
-                        elif any(x in rel_words_unigrams for x in unigrams_bef_words):
-                            #print "****HIT**** 4"
-                            hits_with_r += 1
-
+                        """
                         elif any(x in rel_words_unigrams for x in unigrams_bet_words):
                             #print "****HIT**** 5"
-                            hits_with_r += 1
-
-                        elif any(x in rel_words_unigrams for x in unigrams_aft_words):
-                            #print "****HIT**** 6"
                             hits_with_r += 1
 
                         elif len(set(rel_words_bigrams).intersection(set(bigrams_rel_words))) > 0:
@@ -733,12 +725,26 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                             hits_with_r += 1
                         else:
                             hits_without_r += 1
+                        """
 
-                """
-                print "hits_with_r", hits_with_r
-                print "hits_without_r", hits_without_r
-                print
-                """
+                        """
+                        elif any(x in rel_words_unigrams for x in unigrams_bef_words):
+                            #print "****HIT**** 4"
+                            hits_with_r += 1
+                        """
+
+                        """
+                        elif any(x in rel_words_unigrams for x in unigrams_aft_words):
+                            #print "****HIT**** 6"
+                            hits_with_r += 1
+                        """
+
+                #print "hits_with_r", hits_with_r
+                #print "hits_without_r", hits_without_r
+                hits_without_r = len(hits)-discarded
+
+                # assert all sentences were processed, if this fails, increase q_limit
+                assert len(hits) == hits_without_r + discarded
 
                 if hits_with_r > 0 and hits_without_r == 0:
                     # it can be the case that hits_with_r > 0 and hits_without_r = 0
@@ -750,6 +756,8 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     print "**VALID**:", entity1, '\t', entity2
                     print "hits_without_r ", float(hits_without_r)
                     print "hits_with_r ", float(hits_with_r)
+                    print "discarded", discarded
+                    print "Index hits", len(hits)
                     print r.sentence
                     print r.bet_words
                     print
@@ -763,6 +771,8 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print "**VALID**:", entity1, '\t', entity2
                         print "hits_without_r ", float(hits_without_r)
                         print "hits_with_r ", float(hits_with_r)
+                        print "discarded", discarded
+                        print "Index hits", len(hits)
                         print "PMI", pmi
                         print r.sentence
                         print r.bet_words
@@ -770,6 +780,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         """
 
                     else:
+                        #TODO: antes de discartar verificar com uma lista de palavras
                         not_found.append(r)
                         """
                         print "**INVALID**:"
@@ -783,13 +794,13 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print "AFT", r.aft_words, fact_aft_words_tokens
                         print "hits_without_r ", float(hits_without_r)
                         print "hits_with_r ", float(hits_with_r)
-                        print "PMI", pmi
+                        print "discarded", discarded
                         print "Index hits", len(hits)
+                        print "PMI", pmi
                         print
                         """
                 else:
                     not_found.append(r)
-                count += 1
 
             except Queue.Empty:
                 break
@@ -801,8 +812,10 @@ def find_intersection(results, no_matches, database, queue):
         try:
             r = queue.get_nowait()
             count += 1
-            if count % 500 == 0:
-                print multiprocessing.current_process(), "In Queue", queue.qsize()
+            if count % 50 == 0:
+                sys.stdout.write(str(multiprocessing.current_process())+" To Process: "+str(queue.qsize()) +
+                                 " Correct found: "+str(len(results))+'\n')
+                sys.stdout.flush()
 
             if r.e1 in database.keys():
                 if r.e2 in database[r.e1]:
