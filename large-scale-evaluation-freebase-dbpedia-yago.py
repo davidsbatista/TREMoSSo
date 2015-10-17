@@ -47,7 +47,7 @@ installations_in_bigrams = ['based in', 'located in', 'main office', ' main offi
 ######## AFFILIATION ########
 
 affiliation_unigrams = ['chief', 'chairman', 'professor', 'executive', 'biologist', 'ceo', 'CEO', 'employer',
-                        'president', 'head']
+                        'president', 'head', 'administrator', 'governor']
 affiliation_bigrams = ['chief executive', 'technical chief', 'top executive', 'nuclear chief']
 
 
@@ -62,7 +62,6 @@ located_in_bigrams = ['capital of', 'suburb of', 'city of', 'island', 'region of
 
 spouse_unigrams = ['married', 'wife']
 spouse_bigrams = ['married to', 'his wife']
-
 
 
 # tokens between entities which do not represent relationships
@@ -86,6 +85,23 @@ manager = multiprocessing.Manager()
 all_in_database = manager.dict()
 
 
+class Triple(object):
+    def __init__(self, _e1, _e2, _bet):
+        self.e1 = _e1
+        self.e2 = _e2
+        self.bet_words = _bet
+
+    def __hash__(self):
+        sig = hash(self.e1) ^ hash(self.e2) ^ hash(self.bet_words)
+        return sig
+
+    def __eq__(self, other):
+        if self.e1 == other.e1 and self.e2 == other.e2 and self.bet_words == other.bet_words:
+            return True
+        else:
+            return False
+
+
 class ExtractedFact(object):
     def __init__(self, _e1, _e2, _score, _bef, _bet, _aft, _sentence, _passive_voice):
         self.e1 = _e1
@@ -106,11 +122,14 @@ class ExtractedFact(object):
                 return 0
 
     def __hash__(self):
-        sig = hash(self.e1) ^ hash(self.e2) ^ hash(self.bet_words)
+        sig = hash(self.e1) ^ hash(self.e2) ^ hash(self.bef_words) ^ hash(self.bet_words) ^ hash(self.aft_words) ^ \
+            hash(self.score) ^ hash(self.sentence)
         return sig
 
     def __eq__(self, other):
-        if self.e1 == other.e1 and self.e2 == other.e2 and self.bet_words == other.bet_words:
+        if self.e1 == other.ent1 and self.e2 == other.ent2 and self.score == other.score and self.bef_words == \
+                other.bef_words and self.bet_words == other.bet_words and self.aft_words == other.aft_words \
+                and self.sentence == other.sentence:
             return True
         else:
             return False
@@ -631,7 +650,6 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                     print "hits_without_r ", float(hits_without_r)
                     print "hits_with_r ", float(hits_with_r)
                     print r.sentence
-                    print r.bet_words
                     print
 
                 elif hits_with_r > 0 and hits_without_r > 0:
@@ -667,17 +685,19 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
         while True:
             try:
                 r = queue.get_nowait()
+                t = Triple(r.e1, r.e2, r.bet_words)
+
                 count += 1
                 if count % 50 == 0:
                     sys.stdout.write(str(multiprocessing.current_process())+" To Process: "+str(queue.qsize()) +
                                      " Correct found: "+str(len(results))+'\n')
                     sys.stdout.flush()
 
-                if r in cache_correct:
+                if t in cache_correct:
                     results.append(r)
                     continue
 
-                if r in cache_incorrect:
+                if t in cache_incorrect:
                     not_found.append(r)
                     continue
 
@@ -724,7 +744,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     #   all the ocurrences of the two entities are with the 'fact_bet_words_tokens' (from the output)
                     #   this should be considered as positive match
                     results.append(r)
-                    cache_correct.add(r)
+                    cache_correct.add(t)
                     """
                     print "**VALID**:", entity1, '\t', entity2
                     print "hits_without_r ", float(hits_without_r)
@@ -740,7 +760,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     pmi = float(hits_with_r) / float(hits_without_r)
                     if pmi >= PMI:
                         results.append(r)
-                        cache_correct.add(r)
+                        cache_correct.add(t)
                         """
                         print "**VALID**:", entity1, '\t', entity2
                         print "hits_without_r ", float(hits_without_r)
@@ -755,34 +775,27 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
 
                     else:
                         # check agains a list
-                        if fact_bet_words_tokens in rel_words_unigrams:
+                        if r.bet_words.strip() in rel_words_unigrams:
                             results.append(r)
-                            cache_correct.add(r)
+                            cache_correct.add(t)
 
-                        elif fact_bet_words_tokens in rel_words_bigrams:
+                        elif r.bet_words.strip() in rel_words_bigrams:
                             results.append(r)
-                            cache_correct.add(r)
+                            cache_correct.add(t)
 
                         else:
                             not_found.append(r)
-                            cache_incorrect.add(r)
+                            cache_incorrect.add(t)
                             """
                             print "**INVALID**:"
                             print 'ExtractedFact:', entity1, '\t', entity2
-                            print r.sentence
-                            fact_bet_words_tokens = word_tokenize(r.bet_words)
-                            print "BET", r.bet_words, fact_bet_words_tokens
-                            print "Index hits", len(hits)
-                            print "discarded", discarded
-                            print "hits_without_r ", float(hits_without_r)
-                            print "hits_with_r ", float(hits_with_r)
-                            print "PMI", pmi
+                            print r.bet_words.strip()
                             print
                             """
 
                 else:
                     not_found.append(r)
-                    cache_incorrect.add(r)
+                    cache_incorrect.add(t)
 
             except Queue.Empty:
                 break
