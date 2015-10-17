@@ -752,23 +752,26 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     #   all the ocurrences of the two entities are with the 'fact_bet_words_tokens' (from the output)
                     #   this should be considered as positive match
                     results.append(r)
-                    """
                     print "**VALID**:", entity1, '\t', entity2
+                    print "PMI", pmi
                     print "hits_without_r ", float(hits_without_r)
                     print "hits_with_r ", float(hits_with_r)
                     print "discarded", discarded
-                    print "Index hits", len(hits)
                     print r.sentence
                     print r.bet_words
                     print
-                    """
 
                 elif hits_with_r > 0 and hits_without_r > 0:
                     pmi = float(hits_with_r) / float(hits_without_r)
                     if pmi >= PMI:
                         results.append(r)
-                        """
                         print "**VALID**:", entity1, '\t', entity2
+                        fact_bef_words_tokens = word_tokenize(r.bef_words)
+                        fact_bet_words_tokens = word_tokenize(r.bet_words)
+                        fact_aft_words_tokens = word_tokenize(r.aft_words)
+                        print "BEF", r.bef_words, fact_bef_words_tokens
+                        print "BET", r.bet_words, fact_bet_words_tokens
+                        print "AFT", r.aft_words, fact_aft_words_tokens
                         print "hits_without_r ", float(hits_without_r)
                         print "hits_with_r ", float(hits_with_r)
                         print "discarded", discarded
@@ -777,12 +780,10 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print r.sentence
                         print r.bet_words
                         print
-                        """
 
                     else:
                         #TODO: antes de discartar verificar com uma lista de palavras
                         not_found.append(r)
-                        """
                         print "**INVALID**:"
                         print 'ExtractedFact:', entity1, '\t', entity2
                         print r.sentence
@@ -798,7 +799,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         print "Index hits", len(hits)
                         print "PMI", pmi
                         print
-                        """
+
                 else:
                     not_found.append(r)
 
