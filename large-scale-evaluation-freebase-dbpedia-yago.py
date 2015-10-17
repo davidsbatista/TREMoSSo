@@ -27,12 +27,14 @@ num_cpus = 0
 
 # relational words to be used in calculating the set C and D aplpying the  with the proximity PMI
 
-#TODO: adicionar mais palavras
 founder_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofounded', 'founded', 'founders']
 founder_bigrams = ['started by']
 
 owns_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
 owns_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 'owned by']
+
+
+######## INSTALLATIONS ########
 
 installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office', 'building', 'buildings', 'factory',
                              'plant', 'compund']
@@ -41,8 +43,15 @@ installations_in_bigrams = ['based in', 'located in', 'main office', ' main offi
                             'office in', 'branch in', 'store in', 'firm in', 'factory in', 'plant in', 'head office',
                             'head offices', 'in central', 'in downton', 'outskirts of', 'suburs of', 'branch in']
 
-affiliation_unigrams = ['chief', 'scientist', 'professor', 'biologist', 'ceo', 'CEO', 'employer', 'president', 'head']
-affiliation_bigrams = []
+
+######## AFFILIATION ########
+
+affiliation_unigrams = ['chief', 'chairman', 'professor', 'executive', 'biologist', 'ceo', 'CEO', 'employer',
+                        'president', 'head']
+affiliation_bigrams = ['chief executive', 'technical chief', 'top executive', 'nuclear chief']
+
+
+######## STUDIED ########
 
 studied_unigrams = ['graduated', 'earned', 'degree']
 studied_bigrams = ['graduated from', 'earned phd', 'studies at', 'studied at', 'student at']
@@ -54,13 +63,15 @@ located_in_bigrams = ['capital of', 'suburb of', 'city of', 'island', 'region of
 spouse_unigrams = ['married', 'wife']
 spouse_bigrams = ['married to', 'his wife']
 
+
+
 # tokens between entities which do not represent relationships
 bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
 stopwords = stopwords.words('english')
 not_valid = bad_tokens + stopwords
 
 # PMI value for proximity
-PMI = 0.7
+PMI = 0.65
 
 # Parameters for relationship extraction from Sentence
 MAX_TOKENS_AWAY = 6
@@ -95,14 +106,11 @@ class ExtractedFact(object):
                 return 0
 
     def __hash__(self):
-        sig = hash(self.e1) ^ hash(self.e2) ^ hash(self.bef_words) ^ hash(self.bet_words) ^ hash(self.aft_words) ^ \
-            hash(self.score) ^ hash(self.sentence)
+        sig = hash(self.e1) ^ hash(self.e2) ^ hash(self.bet_words)
         return sig
 
     def __eq__(self, other):
-        if self.ent1 == other.ent1 and self.ent2 == other.ent2 and self.score == other.score and self.bef_words == \
-                other.bef_words and self.bet_words == other.bet_words and self.aft_words == other.aft_words \
-                and self.sentence == other.sentence:
+        if self.e1 == other.e1 and self.e2 == other.e2 and self.bet_words == other.bet_words:
             return True
         else:
             return False
@@ -650,6 +658,11 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
     idx = open_dir(index)
     count = 0
     q_limit = 50000
+
+    # cache to store already evaluted triples
+    cache_correct = set()
+    cache_incorrect = set()
+
     with idx.searcher() as searcher:
         while True:
             try:
@@ -660,7 +673,17 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                                      " Correct found: "+str(len(results))+'\n')
                     sys.stdout.flush()
 
-                # if its not in the database calculate the PMI
+                if r in cache_correct:
+                    results.append(r)
+                    continue
+
+                if r in cache_incorrect:
+                    not_found.append(r)
+                    continue
+
+                # relational phrase/word of the relationship/triple
+                fact_bet_words_tokens = word_tokenize(r.bet_words)
+
                 entity1 = "<" + e1_type + ">" + r.e1 + "</" + e1_type + ">"
                 entity2 = "<" + e2_type + ">" + r.e2 + "</" + e2_type + ">"
                 t1 = query.Term('sentence', entity1)
@@ -670,80 +693,29 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                 q1 = spans.SpanNear2([t1, t3], slop=MAX_TOKENS_AWAY, ordered=True, mindist=1)
                 hits = searcher.search(q1, limit=q_limit)
 
-                # Entities proximity considering relational words
-                # From the results above count how many contain a relational word
+                # Entities proximity considering relational word
+                # From the results above count how many contain the relational word/phrase
                 hits_with_r = 0
                 discarded = 0
-                fact_bet_words_tokens = word_tokenize(r.bet_words)
-
-                #print entity1, '\t', entity2, len(hits), "\n"
-                #print "fact words", fact_bet_words_tokens
 
                 for s in hits:
                     sentence = s.get("sentence")
                     start_e1 = sentence.rindex(entity1)
                     end_e1 = start_e1+len(entity1)
                     start_e2 = sentence.rindex(entity2)
-                    end_e2 = start_e2+len(entity2)
-                    bef = sentence[:start_e1]
-                    aft = sentence[end_e2:]
                     bet = sentence[end_e1:start_e2]
                     bet_tokens = word_tokenize(bet)
-                    bef_tokens = word_tokenize(bef)
-                    aft_tokens = word_tokenize(aft)
 
                     if not (MIN_TOKENS_AWAY <= len(bet_tokens) <= MAX_TOKENS_AWAY):
                         discarded += 1
                         continue
 
-                    else:
-                        #bef_tokens = bef_tokens[CONTEXT_WINDOW:]
-                        #aft_tokens = aft_tokens[:CONTEXT_WINDOW]
-                        #unigrams_bef_words = bef_tokens
-                        #unigrams_aft_words = aft_tokens
-                        unigrams_bet_words = bet_tokens
-                        bigrams_rel_words = extract_bigrams(bet)
+                    elif fact_bet_words_tokens == bet_tokens:
+                        hits_with_r += 1
 
-                        """
-                        print sentence
-                        print unigrams_bet_words
-                        print bigrams_rel_words
-                        print
-                        """
-
-                        if fact_bet_words_tokens == unigrams_bet_words:
-                            #print "****HIT**** 1"
-                            hits_with_r += 1
-
-                        """
-                        elif any(x in rel_words_unigrams for x in unigrams_bet_words):
-                            #print "****HIT**** 5"
-                            hits_with_r += 1
-
-                        elif len(set(rel_words_bigrams).intersection(set(bigrams_rel_words))) > 0:
-                            #print "****HIT**** 7"
-                            hits_with_r += 1
-                        else:
-                            hits_without_r += 1
-                        """
-
-                        """
-                        elif any(x in rel_words_unigrams for x in unigrams_bef_words):
-                            #print "****HIT**** 4"
-                            hits_with_r += 1
-                        """
-
-                        """
-                        elif any(x in rel_words_unigrams for x in unigrams_aft_words):
-                            #print "****HIT**** 6"
-                            hits_with_r += 1
-                        """
-
-                #print "hits_with_r", hits_with_r
-                #print "hits_without_r", hits_without_r
                 hits_without_r = len(hits)-discarded
 
-                # assert all sentences were processed, if this fails, increase q_limit
+                # assert all indexed sentences were processed, if this fails, increase q_limit
                 assert len(hits) == hits_without_r + discarded
 
                 if hits_with_r > 0 and hits_without_r == 0:
@@ -752,6 +724,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     #   all the ocurrences of the two entities are with the 'fact_bet_words_tokens' (from the output)
                     #   this should be considered as positive match
                     results.append(r)
+                    cache_correct.add(r)
                     """
                     print "**VALID**:", entity1, '\t', entity2
                     print "hits_without_r ", float(hits_without_r)
@@ -767,6 +740,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     pmi = float(hits_with_r) / float(hits_without_r)
                     if pmi >= PMI:
                         results.append(r)
+                        cache_correct.add(r)
                         """
                         print "**VALID**:", entity1, '\t', entity2
                         print "hits_without_r ", float(hits_without_r)
@@ -780,27 +754,35 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         """
 
                     else:
-                        #TODO: antes de discartar verificar com uma lista de palavras
-                        not_found.append(r)
-                        """
-                        print "**INVALID**:"
-                        print 'ExtractedFact:', entity1, '\t', entity2
-                        print r.sentence
-                        fact_bef_words_tokens = word_tokenize(r.bef_words)
-                        fact_bet_words_tokens = word_tokenize(r.bet_words)
-                        fact_aft_words_tokens = word_tokenize(r.aft_words)
-                        print "BEF", r.bef_words, fact_bef_words_tokens
-                        print "BET", r.bet_words, fact_bet_words_tokens
-                        print "AFT", r.aft_words, fact_aft_words_tokens
-                        print "hits_without_r ", float(hits_without_r)
-                        print "hits_with_r ", float(hits_with_r)
-                        print "discarded", discarded
-                        print "Index hits", len(hits)
-                        print "PMI", pmi
-                        print
-                        """
+                        # check agains a list
+                        if fact_bet_words_tokens in rel_words_unigrams:
+                            results.append(r)
+                            cache_correct.add(r)
+
+                        elif fact_bet_words_tokens in rel_words_bigrams:
+                            results.append(r)
+                            cache_correct.add(r)
+
+                        else:
+                            not_found.append(r)
+                            cache_incorrect.add(r)
+                            """
+                            print "**INVALID**:"
+                            print 'ExtractedFact:', entity1, '\t', entity2
+                            print r.sentence
+                            fact_bet_words_tokens = word_tokenize(r.bet_words)
+                            print "BET", r.bet_words, fact_bet_words_tokens
+                            print "Index hits", len(hits)
+                            print "discarded", discarded
+                            print "hits_without_r ", float(hits_without_r)
+                            print "hits_with_r ", float(hits_with_r)
+                            print "PMI", pmi
+                            print
+                            """
+
                 else:
                     not_found.append(r)
+                    cache_incorrect.add(r)
 
             except Queue.Empty:
                 break
@@ -985,7 +967,7 @@ def main():
     print "\nLoading relationships from Freebase"
     for f in freebase_ground_truth:
         print f.split('/')[-1],
-        process_freebase(freebase_ground_truth, database, f.split('/')[-1])
+        process_freebase(freebase_ground_truth, database, rel_type)
         print
 
     print "\nLoading relationships from DBpedia"
