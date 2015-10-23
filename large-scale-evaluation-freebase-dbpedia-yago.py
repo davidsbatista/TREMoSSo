@@ -589,6 +589,7 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                 r = queue.get_nowait()
                 if count % 50 == 0:
                     print multiprocessing.current_process(), "In Queue", queue.qsize(), "Total Matched: ", len(results)
+
                 #TODO: fazer uma cache
 
                 t1 = query.Term('sentence', "<" + e1_type + ">" + r.e1 + "</" + e1_type + ">")
@@ -627,6 +628,7 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                                 continue
 
                             elif any(x in rel_words_unigrams for x in unigrams_rel_words):
+                                """
                                 print "UNIGRAMS HIT"
                                 print s_r.sentence
                                 print s_r.e1
@@ -635,9 +637,11 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                                 print "unigrams_rel_words", unigrams_rel_words
                                 print "rel_words_unigrams", rel_words_unigrams
                                 print "\n"
+                                """
                                 hits_with_r += 1
 
                             elif any(x in rel_words_bigrams for x in bigrams_rel_words):
+                                """
                                 print "BIGRAMS HIT"
                                 print s_r.sentence
                                 print s_r.e1
@@ -646,6 +650,7 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                                 print "rel_words_unigrams", rel_words_unigrams
                                 print "unigrams_rel_words", unigrams_rel_words
                                 print "\n"
+                                """
                                 hits_with_r += 1
                             else:
                                 hits_without_r += 1
@@ -933,6 +938,15 @@ def main():
     elif rel_type == 'affiliation':
         e1_type = "ORG"
         e2_type = "PER"
+        rel_words_unigrams = affiliation_unigrams
+        rel_words_bigrams = affiliation_bigrams
+        freebase_ground_truth = [base_dir+"freebase_employment.txt", base_dir+"freebase_governance.txt",
+                                 base_dir+"freebase_leader_of.txt"]
+        yago_ground_truth = [base_dir+"yago_isAffiliatedTo.txt", base_dir+"yago_worksAt.txt"]
+
+    elif rel_type == 'affiliation2':
+        e1_type = "PER"
+        e2_type = "ORG"
         rel_words_unigrams = affiliation_unigrams
         rel_words_bigrams = affiliation_bigrams
         freebase_ground_truth = [base_dir+"freebase_employment.txt", base_dir+"freebase_governance.txt",
