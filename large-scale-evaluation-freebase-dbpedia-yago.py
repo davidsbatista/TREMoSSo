@@ -65,8 +65,8 @@ located_in_unigrams = ['capital', 'suburb', 'city', 'island', 'region']
 located_in_bigrams = ['capital of', 'suburb of', 'city of', 'island', 'region of', 'in southern', 'in northern',
                       'northwest of', 'town in']
 
-spouse_unigrams = ['married', 'wife']
-spouse_bigrams = ['married to', 'his wife']
+spouse_unigrams = ['married', 'wife', 'husband']
+spouse_bigrams = ['married to', 'his wife', 'her husband']
 
 
 # tokens between entities which do not represent relationships
@@ -274,7 +274,11 @@ def process_freebase(data, database, rel_type):
             sys.exit(0)
 
         # follow the order of the relationships as in the output
-        if rel_type in ['founder', 'affiliation']:
+        if rel_type == 'spouse':
+            database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
+            database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
+
+        elif rel_type in ['founder', 'affiliation']:
             database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
         else:
             database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
@@ -973,14 +977,6 @@ def main():
         dbpedia_ground_truth = []
         yago_ground_truth = []
         freebase_ground_truth = [base_dir+"freebase_married_to.txt", base_dir+"freebase_spouse_partner.txt"]
-
-    elif rel_type == 'invested-in':
-        e1_type = "ORG"
-        e2_type = "ORG"
-        #TODO: words e outras KB
-        #rel_words_unigrams = invested_unigrams
-        #rel_words_bigrams = invested_bigrams
-        freebase_ground_truth = [base_dir+"freebase_venture_investment.txt"]
 
     else:
         print "Invalid relationship type", rel_type
