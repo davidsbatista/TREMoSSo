@@ -204,7 +204,7 @@ def process_output(data, threshold, rel_type):
     return system_output
 
 
-def process_dbpedia(data, database, file_rel_type):
+def process_dbpedia(data, database, file_rel_type, rel_type):
     for line in fileinput.input(data):
         try:
             e1, rel, e2, p = line.strip().split('>')
@@ -226,7 +226,7 @@ def process_dbpedia(data, database, file_rel_type):
         for pair in pairs:
             e1 = pair[0]
             e2 = pair[1]
-            if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt']:
+            if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt'] or rel_type in ['studied2']:
                 database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
             else:
                 database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
@@ -256,7 +256,7 @@ def process_yago(data, database, rel_type):
         for pair in pairs:
             e1 = pair[0]
             e2 = pair[1]
-            if rel_type in ['founder', 'affiliation']:
+            if rel_type in ['founder', 'affiliation', 'studied2']:
                 database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
             else:
                 database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
@@ -944,6 +944,15 @@ def main():
         dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
         yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
 
+    elif rel_type == 'studied2':
+        e1_type = "ORG"
+        e2_type = "PER"
+        rel_words_unigrams = studied_unigrams
+        rel_words_bigrams = studied_bigrams
+        freebase_ground_truth = []
+        dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
+        yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
+
     elif rel_type == 'located-in':
         e1_type = "LOC"
         e2_type = "LOC"
@@ -994,7 +1003,7 @@ def main():
     if dbpedia_ground_truth is not None:
         for f in dbpedia_ground_truth:
             print f.split('/')[-1],
-            process_dbpedia(dbpedia_ground_truth, database, f.split('/')[-1])
+            process_dbpedia(dbpedia_ground_truth, database, f.split('/')[-1], rel_type)
             print
 
     print "\nLoading relationships from Yago"
