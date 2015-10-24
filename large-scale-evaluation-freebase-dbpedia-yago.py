@@ -226,7 +226,9 @@ def process_dbpedia(data, database, file_rel_type, rel_type):
         for pair in pairs:
             e1 = pair[0]
             e2 = pair[1]
-            if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt'] or rel_type in ['studied2']:
+            if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt'] or rel_type in ['studied2',
+                                                                                                   'founder2',
+                                                                                                   'owns2']:
                 database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
             else:
                 database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
@@ -256,7 +258,7 @@ def process_yago(data, database, rel_type):
         for pair in pairs:
             e1 = pair[0]
             e2 = pair[1]
-            if rel_type in ['founder', 'affiliation', 'studied2']:
+            if rel_type in ['founder', 'affiliation', 'studied2', 'owns2']:
                 database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
             else:
                 database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
@@ -278,7 +280,7 @@ def process_freebase(data, database, rel_type):
             database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
             database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
 
-        elif rel_type in ['founder', 'affiliation']:
+        elif rel_type in ['founder', 'affiliation', 'owns2']:
             database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
         else:
             database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
@@ -926,7 +928,25 @@ def main():
         dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
         yago_ground_truth = [base_dir+"yago_created.txt"]
 
+    elif rel_type == 'founder2':
+        e1_type = "PER"
+        e2_type = "ORG"
+        rel_words_unigrams = founder_unigrams
+        rel_words_bigrams = founder_unigrams
+        freebase_ground_truth = [base_dir+"freebase_founded.txt"]
+        dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
+        yago_ground_truth = [base_dir+"yago_created.txt"]
+
     elif rel_type == 'owns':
+        e1_type = "ORG"
+        e2_type = "ORG"
+        rel_words_unigrams = owns_unigrams
+        rel_words_bigrams = owns_unigrams
+        freebase_ground_truth = [base_dir+"freebase_acquired.txt"]
+        dbpedia_ground_truth = [base_dir+"dbpedia_subsidiary.txt"]
+        yago_ground_truth = [base_dir+"yago_owns.txt"]
+
+    elif rel_type == 'owns2':
         e1_type = "ORG"
         e2_type = "ORG"
         rel_words_unigrams = owns_unigrams
