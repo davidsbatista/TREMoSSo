@@ -191,13 +191,19 @@ def process_output(data, threshold, rel_type):
                 bef = ''
             if 'aft' not in locals():
                 aft = ''
-            if passive_voice is True and rel_type in ['acquired', 'installations-in']:
+
+            #if passive_voice is True and rel_type in ['acquired', 'installations-in']:
+            if passive_voice is True:
                 r = ExtractedFact(e2, e1, float(score), bef, bet, aft, sentence, passive_voice)
+
             else:
                 r = ExtractedFact(e1, e2, float(score), bef, bet, aft, sentence, passive_voice)
 
+            """
             if ("'s parent" in bet or 'subsidiary of' in bet or bet == 'subsidiary') and rel_type == 'acquired':
                 r = ExtractedFact(e2, e1, float(score), bef, bet, aft, sentence, passive_voice)
+            """
+
             system_output.append(r)
 
     fileinput.close()
@@ -228,7 +234,8 @@ def process_dbpedia(data, database, file_rel_type, rel_type):
             e2 = pair[1]
             if file_rel_type in ['dbpedia_capital.txt', 'dbpedia_largestCity.txt'] or rel_type in ['studied2',
                                                                                                    'founder2',
-                                                                                                   'owns2']:
+                                                                                                   'owns2',
+                                                                                                   'has-installations2']:
                 database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
             else:
                 database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
@@ -258,7 +265,7 @@ def process_yago(data, database, rel_type):
         for pair in pairs:
             e1 = pair[0]
             e2 = pair[1]
-            if rel_type in ['founder', 'affiliation', 'studied2', 'owns2']:
+            if rel_type in ['founder', 'affiliation', 'studied2', 'owns2', 'has-installations2']:
                 database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
             else:
                 database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
@@ -280,10 +287,25 @@ def process_freebase(data, database, rel_type):
             database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
             database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
 
-        elif rel_type in ['founder', 'affiliation', 'owns2']:
+        elif rel_type in ['founder', 'affiliation', 'owns2', 'has-installations2']:
             database[e2.strip().decode("utf8")].add(e1.strip().decode("utf8"))
         else:
             database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
+    fileinput.close()
+
+
+def process_manually(data, database):
+    for line in fileinput.input(data):
+        if line.startswith("#"):
+            continue
+        try:
+            e1, e2 = line.strip().split('\t')
+        except ValueError:
+            print "Error parsing", line
+            sys.exit(0)
+
+        database[e1.strip().decode("utf8")].add(e2.strip().decode("utf8"))
+
     fileinput.close()
 
 
@@ -908,6 +930,7 @@ def main():
     freebase_ground_truth = None
     dbpedia_ground_truth = None
     yago_ground_truth = None
+    manually_added = None
 
     if rel_type == 'has-installations':
         e1_type = "ORG"
@@ -918,6 +941,17 @@ def main():
         dbpedia_ground_truth = [base_dir+"dbpedia_location.txt", base_dir+"dbpedia_headquarter.txt",
                                 base_dir+"dbpedia_locationCity.txt", base_dir+"dbpedia_locationCountry.txt"]
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
+
+    elif rel_type == 'has-installations2':
+        e1_type = "LOC"
+        e2_type = "ORG"
+        rel_words_unigrams = installations_in_unigrams
+        rel_words_bigrams = installations_in_bigrams
+        freebase_ground_truth = [base_dir+"freebase_place_founded.txt"]
+        dbpedia_ground_truth = [base_dir+"dbpedia_location.txt", base_dir+"dbpedia_headquarter.txt",
+                                base_dir+"dbpedia_locationCity.txt", base_dir+"dbpedia_locationCountry.txt"]
+        yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
+        manually_added = [base_dir+"manually_has-installations2.txt"]
 
     elif rel_type == 'founder':
         e1_type = "ORG"
@@ -1005,7 +1039,6 @@ def main():
     elif rel_type == 'spouse':
         e1_type = "PER"
         e2_type = "PER"
-        #TODO: words e outras KB
         rel_words_unigrams = spouse_unigrams
         rel_words_bigrams = spouse_bigrams
         dbpedia_ground_truth = []
@@ -1040,6 +1073,12 @@ def main():
     for f in yago_ground_truth:
         print f.split('/')[-1],
         process_yago(f, database, rel_type)
+        print
+
+    print "\nLoading manually added relationships"
+    for f in manually_added:
+        print f.split('/')[-1],
+        process_manually(f, database)
         print
 
     print
