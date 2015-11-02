@@ -927,10 +927,10 @@ def main():
     # directory with files containing relationships from KB
     base_dir = "/home/dsbatista/gigaword/automatic-evaluation/relationships_gold/"
 
-    freebase_ground_truth = None
-    dbpedia_ground_truth = None
-    yago_ground_truth = None
-    manually_added = None
+    freebase_ground_truth = []
+    dbpedia_ground_truth = []
+    yago_ground_truth = []
+    manually_added = []
 
     if rel_type == 'has-installations':
         e1_type = "ORG"
@@ -988,6 +988,7 @@ def main():
         freebase_ground_truth = [base_dir+"freebase_acquired.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_subsidiary.txt"]
         yago_ground_truth = [base_dir+"yago_owns.txt"]
+        manually_added = [base_dir+"manually_owns2.txt"]
 
     elif rel_type == 'affiliation':
         e1_type = "ORG"
