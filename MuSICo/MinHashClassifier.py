@@ -6,8 +6,10 @@ __email__ = "dsbatista@inesc-id.pt"
 
 import os
 import sys
+import time
 import codecs
 import MinHash
+import functools
 
 from FeatureExtractor import FeatureExtractor
 from LocalitySensitiveHashing import LocalitySensitiveHashing
@@ -19,6 +21,18 @@ CONTEXT_WINDOW = 3
 N_GRAMS_SIZE = 4
 MAX_TOKENS = 6
 MIN_TOKENS = 1
+
+
+def timecall(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kw):
+        start = time.time()
+        result = f(*args, **kw)
+        end = time.time()
+        print "Time taken: %.2f seconds" % (end - start)
+        return result
+
+    return wrapper
 
 
 def classify_sentences(data_file, lsh):
@@ -46,7 +60,7 @@ def classify_sentences(data_file, lsh):
 
         count += 1
         if count % 100 == 0:
-            sys.stdout.write(".")
+            sys.stdout.write(str(count)+'\n')
 
     f_sentences.close()
 
@@ -64,16 +78,28 @@ def load_training_relationships(data_file, rel_type, rel_id):
                 print e
                 print line
                 sys.exit(-1)
+
         if line.startswith("sentence") and e1 is not None and e2 is not None:
             sentence = line.split("sentence : ")[1]
+
+        if line.startswith("passive voice:") and e1 is not None and e2 is not None:
+            passive_voice = eval(line.split("passive voice:")[1].strip())
+
+        if line == '\n':
             # extract features and calculate min-hash sigs
-            shingles = fe.process_index(sentence, e1, e2)
+            if passive_voice is True:
+                shingles = fe.process_index(sentence, e2, e1)
+            elif passive_voice is False:
+                shingles = fe.process_index(sentence, e1, e2)
+
             sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
             relationships.append((rel_type, rel_id, sigs))
             if rel_id % 100 == 0:
                 sys.stdout.write(".")
             f_features.write(str(rel_id)+'\t'+shingles.getvalue()+'\n')
-            rel_id += 1
+
+        rel_id += 1
+
     f_sentences.close()
     f_features.close()
     return rel_id, relationships

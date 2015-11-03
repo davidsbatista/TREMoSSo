@@ -108,6 +108,7 @@ class FeatureExtractor:
                     between = text_tokens[e1_b+len(e1_info[0]):e2_b]
                     after = text_tokens[e2_b+len(e2_info[0]):]
                     after = after[:CONTEXT_WINDOW]
+
                     return self.extract_features(after, before, between, between_pos)
 
     def process_classify(self, line):
