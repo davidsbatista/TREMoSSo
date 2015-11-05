@@ -32,21 +32,24 @@ class LocalitySensitiveHashing:
             self.sigs_per_band = n_sigs / n_bands
             self.kNN = knn
 
-            for i in range(0, n_bands):
+            for i in range(0, self.n_bands):
                 conn = redis.StrictRedis(host='localhost', port=6379, db=i)
                 self.bands.append(conn)
-            self.minhash_instances = redis.StrictRedis(host='localhost', port=6379, db=n_bands+1)
+
+            # to store the full relationship representations
+            self.minhash_instances = redis.StrictRedis(host='localhost', port=6379, db=self.n_bands+1)
 
     def index(self, rel):
         # generates a list of equaly sized chunks (arrays) from the min-hash array
-        # (rel_type, rel_id, sigs)
+        # rel is a tuple consisting: (rel_type, rel_id, sigs)
+
         chunked = [s for s in self.chunks(rel[2], self.sigs_per_band)]
         for i in range(0, len(chunked)):
             sorted_chunk = numpy.sort(chunked[i])
             self.bands[i].set(tuple(sorted_chunk), (rel[0], rel[1]))
 
-        # save the minh-hash signatures of the relationship
-        # allows for real Jaccardi calculation in classication
+        # save the full minh-hash signatures representation of the relationship
+        # allows for Jaccardi calculation in classication
         sigs_pickled = pickle.dumps(rel[2])
         self.minhash_instances.set(rel[1], sigs_pickled)
 
@@ -56,8 +59,6 @@ class LocalitySensitiveHashing:
         candidates = defaultdict(list)
         for i in range(0, len(chunked)):
             sorted_chunk = numpy.sort(chunked[i])
-            # TODO, redis_i, ..., redis_n
-            # .set(tuple(sorted_chunk)
             if self.bands[i].get(tuple(sorted_chunk)):
                 value = eval(self.bands[i].get(tuple(sorted_chunk)))
                 rel_type, rel_id = value[0], value[1]
@@ -71,7 +72,7 @@ class LocalitySensitiveHashing:
                 # get candidate min-hash sigs
                 candidate_sigs = self.minhash_instances.get(rel_id)
 
-                # calculate aproximate Jaccardi Similarity using the full min-hash sigs
+                # calculate Jaccardi Similarity using the min-hash sigs
                 # logical XOR between two array of min-hash sigs:
                 #   - gives False if two elements are equal, True if two elements are different
                 #   - return array of boolean values (False,True)
