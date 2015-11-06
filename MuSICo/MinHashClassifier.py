@@ -39,13 +39,14 @@ def classify_sentences(data_file, lsh):
             # find closest neighbours
             types = lsh.classify(sigs)
             if types is not None:
-                f_output.write(rel.e1+"\t"+rel.e2+'\n'+rel.sentence.encode("utf8")+"\n"+types.encode("utf8")+'\n\n')
+                f_output.write("instance : " + rel.e1+"\t"+rel.e2+'\n')
+                f_output.write("sentence : " + rel.sentence.encode("utf8")+"\n")
+                f_output.write("rel_type : " + types.encode("utf8")+'\n\n')
 
         count += 1
         if count % 100 == 0:
             sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % (time.time() - start)+"\n")
             f_output.flush()
-
 
     f_output.close()
     f_sentences.close()
