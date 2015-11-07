@@ -27,13 +27,45 @@ class FeatureExtractor:
         self.tagger = load('taggers/maxent_treebank_pos_tagger/english.pickle')
         self.reverb = Reverb()
         self.lmtzr = WordNetLemmatizer()
+        self.aux_verbs = ['be', 'have']
 
-    def extract_features(self, after, before, between, between_pos):
+    @staticmethod
+    def extract_prepositions(context, shingles):
+        for token in context:
+            if token[1].startswith("IN") or token[1].startswith("TO"):
+                shingles.write(token[0].encode("utf8").strip() + '_PREP ')
+
+    def extract_verbs(self, context, shingles, context_tag):
+        for token in context:
+            if token[1].startswith("V") and self.lmtzr.lemmatize(token[0], 'v') not in self.aux_verbs:
+                #   VB	- Verb, base form
+                if token[1] == "VB":
+                    shingles.write(token[0].encode("utf8").strip() + '_VB_' + context_tag + ' ')
+
+                # VBD	Verb, past tense
+                # VBN	Verb, past participle
+                if token[1] == "VBD":
+                    shingles.write(token[0].encode("utf8").strip() + '_VBD_' + context_tag + ' ')
+                if token[1] == "VBN":
+                    shingles.write(token[0].encode("utf8").strip() + '_VBN_' + context_tag + ' ')
+
+                # VBP	Verb, non-3rd person singular present
+                # VBZ	Verb, 3rd person singular present
+                if token[1] == "VBP":
+                    shingles.write(token[0].encode("utf8").strip() + '_VBP_' + context_tag + ' ')
+                if token[1] == "VBZ":
+                    shingles.write(token[0].encode("utf8").strip() + '_VBZ_' + context_tag + ' ')
+
+                # VBG	Verb, gerund or present participle
+                if token[1] == "VBG":
+                    shingles.write(token[0].encode("utf8").strip() + '_VBG_' + context_tag + ' ')
+
+    def extract_features(self, after, before, between):
         shingles = StringIO.StringIO()
 
         # relational patterns corresponding to: a verb, followed by nouns, adjectives, or adverbs,
         # and ending with a preposition;
-        reverb_pattern = self.reverb.extract_reverb_patterns_tagged_ptb(between_pos)
+        reverb_pattern = self.reverb.extract_reverb_patterns_tagged_ptb(between)
         if len(reverb_pattern) > 0:
             passive_voice = self.reverb.detect_passive_voice(reverb_pattern)
             pattern = '_'.join([t[0] for t in reverb_pattern])
@@ -55,32 +87,23 @@ class FeatureExtractor:
             pattern_normalized += 'RVB_NORM'
             shingles.write(pattern_normalized.encode("utf8").strip() + ' ')
 
-        # print between_pos
+        # verbs from all contexts, except aux verbs
+        self.extract_verbs(before, shingles, 'BEF')
+        self.extract_verbs(between, shingles, 'BET')
+        self.extract_verbs(after, shingles, 'AFT')
 
-        # all verbs (except aux) in between
+        # prepositions from BET context
+        self.extract_prepositions(between, shingles)
 
-        # verb forms in the past participle tense;
-        """
-        VB	Verb, base form
-        28.	VBD	Verb, past tense
-        29.	VBG	Verb, gerund or present participle
-        30.	VBN	Verb, past participle
-        31.	VBP	Verb, non-3rd person singular present
-        32.	VBZ	Verb, 3rd person singular present
-        """
-        # prepositions;
-
-        # infinitive forms of verbs, except auxiliary verbs;
-
-        #nouns from the BET context
-        for t in between_pos:
+        # nouns from the BET context
+        for t in between:
             if t[1] == 'NN':
                 shingles.write(t[0].encode("utf8").strip()+'_NN_BET' + ' ')
 
-        # n-grams of characters
-        bef_grams = self.extract_ngrams_chars(' '.join(before), "BEF")
-        bet_grams = self.extract_ngrams_chars(' '.join(between), "BET")
-        aft_grams = self.extract_ngrams_chars(' '.join(after), "AFT")
+        # n-grams of characters from all contexts
+        bef_grams = self.extract_ngrams_chars(' '.join([token[0] for token in before]), "BEF")
+        bet_grams = self.extract_ngrams_chars(' '.join([token[0] for token in between]), "BET")
+        aft_grams = self.extract_ngrams_chars(' '.join([token[0] for token in after]), "AFT")
 
         for shingle in bef_grams, bet_grams, aft_grams:
             shingles.write(shingle.encode("utf8").strip() + ' ')
@@ -102,14 +125,13 @@ class FeatureExtractor:
                 if distance > MAX_TOKENS or distance < MIN_TOKENS:
                     continue
                 else:
-                    before = text_tokens[:e1_b]
+                    before = text_tagged[:e1_b]
                     before = before[-CONTEXT_WINDOW:]
-                    between_pos = text_tagged[e1_b+len(e1_info[0]):e2_b]
-                    between = text_tokens[e1_b+len(e1_info[0]):e2_b]
-                    after = text_tokens[e2_b+len(e2_info[0]):]
+                    between = text_tagged[e1_b+len(e1_info[0]):e2_b]
+                    after = text_tagged[e2_b+len(e2_info[0]):]
                     after = after[:CONTEXT_WINDOW]
 
-                    return self.extract_features(after, before, between, between_pos)
+                    return self.extract_features(after, before, between)
 
     def process_classify(self, line):
         sentence = Sentence(line.strip(), MAX_TOKENS,  MIN_TOKENS, CONTEXT_WINDOW, self.tagger)
