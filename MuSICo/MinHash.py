@@ -28,12 +28,4 @@ def min_hash(shingles, function_id):
 
 
 def hash_function(shingle, function_id):
-    #TODO: usar funções mais rápidas
-    #return hash(shingle * function_id * function_id)
-    #return hash(shingle * function_id)
-    try:
-        return xxhash.xxh32(shingle * function_id).intdigest()
-    except Exception, e:
-        print e
-        print shingle
-        sys.exit(-1)
+    return xxhash.xxh32(shingle * function_id).intdigest()

@@ -39,19 +39,17 @@ class LocalitySensitiveHashing:
             # to store the full relationship representations
             self.minhash_instances = redis.StrictRedis(host='localhost', port=6379, db=self.n_bands+1)
 
-    def index(self, rel):
+    def index(self, rel_type, rel_id, sigs):
         # generates a list of equaly sized chunks (arrays) from the min-hash array
-        # rel is a tuple consisting: (rel_type, rel_id, sigs)
-
-        chunked = [s for s in self.chunks(rel[2], self.sigs_per_band)]
+        chunked = [s for s in self.chunks(sigs, self.sigs_per_band)]
         for i in range(0, len(chunked)):
             sorted_chunk = numpy.sort(chunked[i])
-            self.bands[i].set(tuple(sorted_chunk), (rel[0], rel[1]))
+            self.bands[i].set(tuple(sorted_chunk), (rel_type, rel_id))
 
         # save the full minh-hash signatures representation of the relationship
         # allows for Jaccardi calculation in classication
-        sigs_pickled = pickle.dumps(rel[2])
-        self.minhash_instances.set(rel[1], sigs_pickled)
+        sigs_pickled = pickle.dumps(sigs)
+        self.minhash_instances.set(rel_id, sigs_pickled)
 
     def classify(self, sigs):
         # generates a list of equaly sized chunks (arrays) from the min-hash array

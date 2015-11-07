@@ -28,16 +28,19 @@ def classify_sentences(data_file, lsh):
     f_sentences = codecs.open(data_file, encoding='utf-8')
     f_output = open("results.txt", "wb")
     count = 0
-    start = time.time()
+    elapsed_time = 0
     for line in f_sentences:
         if line.startswith("#"):
             continue
         else:
+            start_time = time.time()
+            # extract features
             rel, shingles = fe.process_classify(line)
+            # compute signatures
             sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
-
             # find closest neighbours
             types = lsh.classify(sigs)
+            elapsed_time += time.time() - start_time
             if types is not None:
                 f_output.write("instance: " + rel.e1+"\t"+rel.e2+'\n')
                 f_output.write("sentence: " + rel.sentence.encode("utf8")+"\n")
@@ -45,32 +48,43 @@ def classify_sentences(data_file, lsh):
 
         count += 1
         if count % 100 == 0:
-            sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % (time.time() - start)+"\n")
+            sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time+"\n")
             f_output.flush()
 
     f_output.close()
     f_sentences.close()
 
 
-def load_training_relationships(data_file):
+def process_training_data(data_file):
     #TODO: parallelize
+    print "Extracting features from training data and indexing in LSH\n"
+    print "MinHash Signatures : ", N_SIGS
+    print "Bands              : ", N_BANDS
+    print
     relationships = []
     f_sentences = codecs.open(data_file, encoding='utf-8')
+    lsh = LocalitySensitiveHashing(N_BANDS, N_SIGS, KNN)
+    lsh.create()
     fe = FeatureExtractor()
-    start = time.time()
-
+    count = 0
+    elapsed_time = 0
     for line in f_sentences:
         if line == '\n':
             continue
         rel_id, rel_type, e1, e2, sentence = line.split('\t')
         rel_id = int(rel_id.split(":")[1])
+        start_time = time.time()
         shingles = fe.process_index(sentence, e1, e2)
-        sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
+        shingles = shingles.getvalue().strip().split(' ')
+        sigs = MinHash.signature(shingles, N_SIGS)
         relationships.append((rel_type, rel_id, sigs, shingles))
-        if rel_id % 100 == 0:
-            sys.stdout.write("Processed " + str(rel_id) + " in %.2f seconds" % (time.time() - start)+"\n")
+        lsh.index(rel_type, rel_id, sigs)
+        elapsed_time += time.time() - start_time
+        count += 1
+        if count % 100 == 0:
+            sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time+"\n")
 
-    sys.stdout.write("Total processing time" + " in %.2f seconds" % (time.time() - start)+"\n")
+    sys.stdout.write("Total processing time" + " in %.2f seconds" % elapsed_time+"\n")
     f_sentences.close()
     f_features = open('features.txt', 'w')
 
@@ -82,38 +96,33 @@ def load_training_relationships(data_file):
     return relationships
 
 
-def load_shingles(shingles_file):
+def index_shingles(shingles_file):
     """
     Parses already extracted shingles from a file.
     File format is: relaltionship_type \t shingle1 shingle2 shingle3 ... shingle_n
     """
-    start = time.time()
-    relationships = []
-    f_shingles = codecs.open(shingles_file, encoding='utf-8')
-    for line in f_shingles:
-        rel_id, rel_type, shingles = line.split('\t')
-        rel_id = int(rel_id)
-        shingles = shingles.strip().split(' ')
-        # calculate min-hash sigs
-        sigs = MinHash.signature(shingles, N_SIGS)
-        relationships.append((rel_type, rel_id, sigs, shingles))
-        if rel_id % 100 == 0:
-            sys.stdout.write("Processed " + str(rel_id) + " in %.2f seconds" % (time.time() - start)+"\n")
-    f_shingles.close()
-
-    return relationships
-
-
-def index_sigs(relationships):
-    print "\nIndexing ", len(relationships), "relationships"
+    print "Indexing relationships"
     print "MinHash Signatures : ", N_SIGS
     print "Bands              : ", N_BANDS
+    print
     lsh = LocalitySensitiveHashing(N_BANDS, N_SIGS, KNN)
     lsh.create()
-    start = time.time()
-    for r in relationships:
-        lsh.index(r)
-    sys.stdout.write("Indexing time: %.2f seconds" % (time.time() - start) + "\n")
+    f_shingles = codecs.open(shingles_file, encoding='utf-8')
+    count = 0
+    elapsed_time = 0
+    for line in f_shingles:
+        rel_id, rel_type, shingles = line.split('\t')
+        shingles = shingles.strip().split(' ')
+        start_time = time.time()
+        sigs = MinHash.signature(shingles, N_SIGS)
+        lsh.index(rel_type, rel_id, sigs)
+        elapsed_time += time.time() - start_time
+        count += 1
+        if count % 100 == 0:
+            sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time + "\n")
+
+    sys.stdout.write("Total Indexing time: %.2f seconds" % elapsed_time + "\n")
+    f_shingles.close()
 
 
 def main():
@@ -137,15 +146,11 @@ def main():
     elif sys.argv[1] == 'index':
         # calculate min-hash sigs (from already extracted shingles) index in bands
         if os.path.isfile("features.txt"):
-            print "Calculating min-hash sigs from features.txt file"
-            relationships = load_shingles('features.txt')
-            index_sigs(relationships)
+            index_shingles('features.txt')
 
         # load sentences, extract features, calculate min-hash sigs, index in bands
         else:
-            print "Extracting features from training data and calculating min-hash sigs\n"
-            relationships = load_training_relationships(sys.argv[2])
-            index_sigs(relationships)
+            process_training_data(sys.argv[2])
 
 if __name__ == "__main__":
     main()
