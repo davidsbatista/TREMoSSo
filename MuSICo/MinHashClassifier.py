@@ -101,28 +101,35 @@ def index_shingles(shingles_file):
     Parses already extracted shingles from a file.
     File format is: relaltionship_type \t shingle1 shingle2 shingle3 ... shingle_n
     """
-    print "Indexing relationships"
-    print "MinHash Signatures : ", N_SIGS
-    print "Bands              : ", N_BANDS
-    print
-    lsh = LocalitySensitiveHashing(N_BANDS, N_SIGS, KNN)
-    lsh.create()
     f_shingles = codecs.open(shingles_file, encoding='utf-8')
-    count = 0
-    elapsed_time = 0
+    relationships = []
+    print "Reading features file"
     for line in f_shingles:
         rel_id, rel_type, shingles = line.split('\t')
         shingles = shingles.strip().split(' ')
+        relationships.append((rel_type, rel_id, shingles))
+    f_shingles.close()
+
+    print "Indexing ", len(relationships), "relationships"
+    print "MinHash Signatures : ", N_SIGS
+    print "Bands              : ", N_BANDS
+    print
+
+    lsh = LocalitySensitiveHashing(N_BANDS, N_SIGS, KNN)
+    lsh.create()
+    count = 0
+    elapsed_time = 0
+
+    for r in relationships:
         start_time = time.time()
-        sigs = MinHash.signature(shingles, N_SIGS)
-        lsh.index(rel_type, rel_id, sigs)
+        sigs = MinHash.signature(r[2], N_SIGS)
+        lsh.index(r[0], r[1], sigs)
         elapsed_time += time.time() - start_time
         count += 1
         if count % 100 == 0:
             sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time + "\n")
 
     sys.stdout.write("Total Indexing time: %.2f seconds" % elapsed_time + "\n")
-    f_shingles.close()
 
 
 def main():
