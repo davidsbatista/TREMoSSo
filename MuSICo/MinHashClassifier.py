@@ -77,9 +77,9 @@ def process_training_data(data_file):
         shingles = fe.process_index(sentence, e1, e2)
         shingles = shingles.getvalue().strip().split(' ')
         sigs = MinHash.signature(shingles, N_SIGS)
-        relationships.append((rel_type, rel_id, sigs, shingles))
         lsh.index(rel_type, rel_id, sigs)
         elapsed_time += time.time() - start_time
+        relationships.append((rel_type, rel_id, sigs, shingles))
         count += 1
         if count % 100 == 0:
             sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time+"\n")
@@ -90,7 +90,7 @@ def process_training_data(data_file):
 
     # write shingles to file
     for rel in relationships:
-        f_features.write(str(rel[1])+'\t'+rel[0].decode("utf8")+'\t'+' '.join(rel[3].getvalue().split())+'\n')
+        f_features.write(str(rel[1])+'\t'+rel[0].decode("utf8")+'\t'+' '.join(rel[3])+'\n')
     f_features.close()
 
     return relationships
