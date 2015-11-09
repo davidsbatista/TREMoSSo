@@ -35,16 +35,19 @@ def classify_sentences(data_file, lsh):
         else:
             start_time = time.time()
             # extract features
-            rel, shingles = fe.process_classify(line)
-            # compute signatures
-            sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
-            # find closest neighbours
-            types = lsh.classify(sigs)
-            elapsed_time += time.time() - start_time
-            if types is not None:
-                f_output.write("instance: " + rel.e1+"\t"+rel.e2+'\n')
-                f_output.write("sentence: " + rel.sentence.encode("utf8")+"\n")
-                f_output.write("rel_type: " + types.encode("utf8")+'\n\n')
+            relationships = fe.process_classify(line)
+            for r in relationships:
+                rel = r[0]
+                shingles = r[1]
+                # compute signatures
+                sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
+                # find closest neighbours
+                types = lsh.classify(sigs)
+                elapsed_time += time.time() - start_time
+                if types is not None:
+                    f_output.write("instance: " + rel.e1+"\t"+rel.e2+'\n')
+                    f_output.write("sentence: " + rel.sentence.encode("utf8")+"\n")
+                    f_output.write("rel_type: " + types.encode("utf8")+'\n\n')
 
         count += 1
         if count % 100 == 0:

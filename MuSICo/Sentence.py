@@ -8,6 +8,7 @@ import re
 from nltk import word_tokenize
 from nltk.corpus import stopwords
 
+
 # tokens between entities which do not represent relationships
 bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
 stopwords = stopwords.words('english')
@@ -72,13 +73,15 @@ class Relationship:
 
 class Sentence:
 
-    def __init__(self, sentence, max_tokens, min_tokens, window_size, pos_tagger=None):
+    def __init__(self, sentence, max_tokens, min_tokens, window_size, pos_tagger):
         self.relationships = list()
-        self.tagged_text = None
 
-        #determine which type of regex to use according to how named-entties are tagged
         entities_regex = re.compile('<[A-Z]+>[^<]+</[A-Z]+>', re.U)
         regex_clean_simple = re.compile('</?[A-Z]+>', re.U)
+        sentence_no_tags = re.sub(regex_clean_simple, "", sentence)
+        text_tokens = word_tokenize(sentence_no_tags)
+        tagged_text = pos_tagger.tag(text_tokens)
+        assert len(tagged_text) == len(text_tokens)
 
         # find named-entities
         entities = []
@@ -123,15 +126,10 @@ class Sentence:
                     if e1.string == e2.string:
                         continue
 
-                    # run PoS-tagger over the sentence only onces
-                    if self.tagged_text is None:
-                        # split text into tokens and tag them
-                        self.tagged_text = pos_tagger.tag(text_tokens)
-
-                    before = text_tokens[:sorted_keys[i]]
+                    before = tagged_text[:sorted_keys[i]]
                     before = before[-window_size:]
-                    between = self.tagged_text[sorted_keys[i]+len(e1.parts):sorted_keys[i+1]]
-                    after = text_tokens[sorted_keys[i+1]+len(e2.parts):]
+                    between = tagged_text[sorted_keys[i]+len(e1.parts):sorted_keys[i+1]]
+                    after = tagged_text[sorted_keys[i+1]+len(e2.parts):]
                     after = after[:window_size]
 
                     # ignore relationships where BET context is only stopwords or other invalid words

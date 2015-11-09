@@ -62,7 +62,6 @@ class FeatureExtractor:
 
     def extract_features(self, after, before, between):
         shingles = StringIO.StringIO()
-
         # relational patterns corresponding to: a verb, followed by nouns, adjectives, or adverbs,
         # and ending with a preposition;
         reverb_pattern = self.reverb.extract_reverb_patterns_tagged_ptb(between)
@@ -134,11 +133,17 @@ class FeatureExtractor:
                     return self.extract_features(after, before, between)
 
     def process_classify(self, line):
+        sentence_no_tags = re.sub(regex_clean_simple, "", line)
+        text_tokens = word_tokenize(sentence_no_tags)
+        text_tagged = self.tagger.tag(text_tokens)
+        assert len(text_tagged) == len(text_tokens)
+
         sentence = Sentence(line.strip(), MAX_TOKENS,  MIN_TOKENS, CONTEXT_WINDOW, self.tagger)
+        relationships = []
         for rel in sentence.relationships:
-            bet_text = [t[0] for t in rel.between]
-            shingles = self.extract_features(rel.after, rel.before, bet_text, rel.between)
-            return rel, shingles
+            shingles = self.extract_features(rel.after, rel.before, rel.between)
+            relationships.append((rel, shingles))
+        return relationships
 
     @staticmethod
     def extract_ngrams_chars(text, context):
