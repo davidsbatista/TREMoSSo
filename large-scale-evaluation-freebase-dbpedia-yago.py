@@ -932,6 +932,8 @@ def main():
     yago_ground_truth = []
     manually_added = []
 
+    #TODO: adicionar os manually added; inserir na BD de relações uma versao da relação sem _Coroporation, _Inc., etc.
+
     if rel_type == 'has-installations':
         e1_type = "ORG"
         e2_type = "LOC"
