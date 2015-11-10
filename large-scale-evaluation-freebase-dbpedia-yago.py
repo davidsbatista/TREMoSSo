@@ -37,12 +37,12 @@ owns_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 
 
 ######## INSTALLATIONS ########
 
-installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office', 'building', 'buildings', 'factory',
-                             'plant', 'compund']
+installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office', 'building', 'buildings']
 
-installations_in_bigrams = ['based in', 'located in', 'main office', ' main offices', 'offices in', 'building in',
-                            'office in', 'branch in', 'store in', 'firm in', 'factory in', 'plant in', 'head office',
-                            'head offices', 'in central', 'in downton', 'outskirts of', 'suburs of', 'branch in']
+installations_in_bigrams = [', based in', 'based in', 'located in', 'main office', 'main offices', 'offices in',
+                            'building in', 'office in', 'head office', 'head offices']
+
+# 'factory in', 'plant in',
 
 
 ######## AFFILIATION ########
@@ -61,16 +61,21 @@ studied_quadrams = [', who graduated from', ', who enrolled at', 'is a graduate 
 studied_pentgrams = ['who graduated from the prestigious']
 
 
+######## LOCATED-IN ########
+
 located_in_unigrams = ['capital', 'suburb', 'city', 'island', 'region']
 located_in_bigrams = ['capital of', 'suburb of', 'city of', 'island', 'region of', 'in southern', 'in northern',
                       'northwest of', 'town in']
+
+
+######## SPOUSE ########
 
 spouse_unigrams = ['married', 'wife', 'husband']
 spouse_bigrams = ['married to', 'his wife', 'her husband']
 
 
 # tokens between entities which do not represent relationships
-bad_tokens = [",", "(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
+bad_tokens = ["(", ")", ";", "''",  "``", "'s", "-", "vs.", "v", "'", ":", ".", "--"]
 stopwords = stopwords.words('english')
 not_valid = bad_tokens + stopwords
 
@@ -244,9 +249,12 @@ def process_dbpedia(data, database, file_rel_type, rel_type):
 
 def process_yago(data, database, rel_type):
     for line in fileinput.input(data):
-        #TODO: remove  "de/" "fr/"
         try:
             e1, rel, e2 = line.strip().split('\t')
+            if "/" in e1:
+                e1 = e1.split("/")[1]
+            if "/" in e2:
+                e2 = e2.split("/")[1]
             e1 = e1.replace("<", "").replace(">", "")
             e2 = e2.replace("<", "").replace(">", "").strip().replace(".", "")
             e2_parts = e2.split(",_")
@@ -625,89 +633,30 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
 
                 # Entities proximity considering relational words
                 # From the results above count how many contain a relational word
-
                 hits_with_r = 0
-                hits_without_r = 0
+                total_hits = 0
 
                 for s in hits:
                     sentence = s.get("sentence")
-                    s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW,
-                                 stopwords)
-
+                    s = Sentence(sentence, e1_type, e2_type, MAX_TOKENS_AWAY, MIN_TOKENS_AWAY, CONTEXT_WINDOW, stopwords)
                     for s_r in s.relationships:
                         if r.e1.decode("utf8") == s_r.e1 and r.e2.decode("utf8") == s_r.e2:
+                            total_hits += 1
                             unigrams_rel_words = s_r.between
                             bigrams_rel_words = extract_bigrams(' '.join(s_r.between))
-
-                            if all(x in not_valid for x in unigrams_rel_words):
-                                hits_without_r += 1
-                                """
-                                print "INVALID"
-                                print s_r.sentence
-                                print s_r.e1
-                                print s_r.e2
-                                print s_r.between
-                                print "\n"
-                                """
+                            if any(x in rel_words_unigrams for x in unigrams_rel_words):
+                                hits_with_r += 1
+                                continue
+                            if any(x in rel_words_bigrams for x in bigrams_rel_words):
+                                hits_with_r += 1
                                 continue
 
-                            elif any(x in rel_words_unigrams for x in unigrams_rel_words):
-                                """
-                                print "UNIGRAMS HIT"
-                                print s_r.sentence
-                                print s_r.e1
-                                print s_r.e2
-                                print s_r.between
-                                print "unigrams_rel_words", unigrams_rel_words
-                                print "rel_words_unigrams", rel_words_unigrams
-                                print "\n"
-                                """
-                                hits_with_r += 1
+                assert total_hits >= hits_with_r
 
-                            elif any(x in rel_words_bigrams for x in bigrams_rel_words):
-                                """
-                                print "BIGRAMS HIT"
-                                print s_r.sentence
-                                print s_r.e1
-                                print s_r.e2
-                                print s_r.between
-                                print "rel_words_unigrams", rel_words_unigrams
-                                print "unigrams_rel_words", unigrams_rel_words
-                                print "\n"
-                                """
-                                hits_with_r += 1
-                            else:
-                                hits_without_r += 1
-
-                if hits_with_r > 0 and hits_without_r == 0:
-                    # it can be the case that hits_with_r > 0 and hits_without_r = 0
-                    # i.e.:
-                    #   all the ocurrences of the two entities are valid ocurrences of the relationship
-                    #   this should be considered as positive match
-                    results.append(r)
-                    print "**VALID**:", r.e1, '\t', r.e2
-                    print "hits_without_r ", float(hits_without_r)
-                    print "hits_with_r ", float(hits_with_r)
-                    print r.sentence
-                    print
-
-                elif hits_with_r > 0 and hits_without_r > 0:
-                    pmi = float(hits_with_r) / float(hits_without_r)
+                if total_hits > 0:
+                    pmi = float(hits_with_r) / float(total_hits)
                     if pmi >= PMI:
-                        """
-                        if word_tokenize(s_r.between)[-1] == 'by':
-                            tmp = s_r.ent2
-                            s_r.ent2 = s_r.ent1
-                            s_r.ent1 = tmp
-                        """
                         results.append(r)
-                        """
-                        print "**ADDED**:", r.e1, '\t', r.e2
-                        print "hits_without_r ", float(hits_without_r)
-                        print "hits_with_r ", float(hits_with_r)
-                        print "PMI", pmi
-                        print
-                        """
                 count += 1
             except Queue.Empty:
                 break
@@ -755,7 +704,6 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                 # Entities proximity considering relational word
                 # From the results above count how many contain the relational word/phrase
                 hits_with_r = 0
-                discarded = 0
 
                 for s in hits:
                     sentence = s.get("sentence")
@@ -766,38 +714,15 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                     bet_tokens = word_tokenize(bet)
 
                     if not (MIN_TOKENS_AWAY <= len(bet_tokens) <= MAX_TOKENS_AWAY):
-                        discarded += 1
                         continue
 
-                    elif fact_bet_words_tokens == bet_tokens:
+                    if fact_bet_words_tokens == bet_tokens:
                         hits_with_r += 1
 
-                hits_without_r = len(hits)-discarded
+                assert len(hits) >= hits_with_r
 
-                # assert all indexed sentences were processed, if this fails, increase q_limit
-                assert len(hits) == hits_without_r + discarded
-
-                """
-                if hits_with_r > 0 and hits_without_r == 0:
-                    # it can be the case that hits_with_r > 0 and hits_without_r = 0
-                    # i.e.:
-                    #   all the ocurrences of the two entities are with the 'fact_bet_words_tokens' (from the output)
-                    #   this should be considered as positive match
-                    results.append(r)
-                    cache_correct.add(t)
-                    print "**VALID**:", entity1, '\t', entity2
-                    print "hits_without_r ", float(hits_without_r)
-                    print "hits_with_r ", float(hits_with_r)
-                    print "discarded", discarded
-                    print "Index hits", len(hits)
-                    print r.sentence
-                    print r.bet_words
-                    print
-
-                """
-
-                if hits_with_r > 0 and hits_without_r > 0:
-                    pmi = float(hits_with_r) / float(hits_without_r)
+                if len(hits) > 0:
+                    pmi = float(hits_with_r) / float(len(hits))
                     if pmi >= PMI:
                         results.append(r)
                         cache_correct.add(t)
@@ -814,7 +739,7 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                         """
 
                     else:
-                        # check agains a list
+                        # check against a list
                         if r.bet_words.strip() in rel_words_unigrams:
                             results.append(r)
                             cache_correct.add(t)
@@ -832,7 +757,6 @@ def proximity_pmi_a(e1_type, e2_type, queue, index, results, not_found, rel_word
                             print r.bet_words.strip()
                             print
                             """
-
                 else:
                     not_found.append(r)
                     cache_incorrect.add(t)
@@ -932,7 +856,7 @@ def main():
     yago_ground_truth = []
     manually_added = []
 
-    #TODO: adicionar os manually added; inserir na BD de relações uma versao da relação sem _Coroporation, _Inc., etc.
+    #TODO: inserir na BD de relações uma versao da relação sem _Coroporation, _Inc., etc.
 
     if rel_type == 'has-installations':
         e1_type = "ORG"
@@ -943,6 +867,7 @@ def main():
         dbpedia_ground_truth = [base_dir+"dbpedia_location.txt", base_dir+"dbpedia_headquarter.txt",
                                 base_dir+"dbpedia_locationCity.txt", base_dir+"dbpedia_locationCountry.txt"]
         yago_ground_truth = [base_dir+"yago_isLocatedIn.txt"]
+        manually_added = [base_dir+"manually_has-installations.txt"]
 
     elif rel_type == 'has-installations2':
         e1_type = "LOC"
@@ -963,6 +888,7 @@ def main():
         freebase_ground_truth = [base_dir+"freebase_founded.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
         yago_ground_truth = [base_dir+"yago_created.txt"]
+        manually_added = [base_dir+"manually_founded.txt"]
 
     elif rel_type == 'founder2':
         e1_type = "PER"
@@ -972,6 +898,7 @@ def main():
         freebase_ground_truth = [base_dir+"freebase_founded.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_founder.txt"]
         yago_ground_truth = [base_dir+"yago_created.txt"]
+        manually_added = [base_dir+"manually_founded2.txt"]
 
     elif rel_type == 'owns':
         e1_type = "ORG"
@@ -981,6 +908,7 @@ def main():
         freebase_ground_truth = [base_dir+"freebase_acquired.txt"]
         dbpedia_ground_truth = [base_dir+"dbpedia_subsidiary.txt"]
         yago_ground_truth = [base_dir+"yago_owns.txt"]
+        manually_added = [base_dir+"manually_owns.txt"]
 
     elif rel_type == 'owns2':
         e1_type = "ORG"
@@ -1000,6 +928,7 @@ def main():
         freebase_ground_truth = [base_dir+"freebase_employment.txt", base_dir+"freebase_governance.txt",
                                  base_dir+"freebase_leader_of.txt"]
         yago_ground_truth = [base_dir+"yago_isAffiliatedTo.txt", base_dir+"yago_worksAt.txt"]
+        manually_added = [base_dir+"manually_affiliation.txt"]
 
     elif rel_type == 'affiliation2':
         e1_type = "PER"
@@ -1009,6 +938,7 @@ def main():
         freebase_ground_truth = [base_dir+"freebase_employment.txt", base_dir+"freebase_governance.txt",
                                  base_dir+"freebase_leader_of.txt"]
         yago_ground_truth = [base_dir+"yago_isAffiliatedTo.txt", base_dir+"yago_worksAt.txt"]
+        manually_added = [base_dir+"manually_affiliation2.txt"]
 
     elif rel_type == 'studied':
         e1_type = "PER"
@@ -1018,6 +948,7 @@ def main():
         freebase_ground_truth = []
         dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
         yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
+        manually_added = [base_dir+"manually_studied.txt"]
 
     elif rel_type == 'studied2':
         e1_type = "ORG"
@@ -1027,6 +958,7 @@ def main():
         freebase_ground_truth = []
         dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
         yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
+        manually_added = [base_dir+"manually_studied2.txt"]
 
     elif rel_type == 'located-in':
         e1_type = "LOC"
@@ -1047,6 +979,7 @@ def main():
         dbpedia_ground_truth = []
         yago_ground_truth = []
         freebase_ground_truth = [base_dir+"freebase_married_to.txt", base_dir+"freebase_spouse_partner.txt"]
+        manually_added = [base_dir+"manually_spouse.txt"]
 
     else:
         print "Invalid relationship type", rel_type
