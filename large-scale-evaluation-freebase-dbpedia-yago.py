@@ -37,7 +37,7 @@ owns_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 
 
 ######## INSTALLATIONS ########
 
-installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office', 'building', 'buildings']
+installations_in_unigrams = ['headquarters', 'headquartered', 'offices', 'office']
 
 installations_in_bigrams = [', based in', 'based in', 'located in', 'main office', 'main offices', 'offices in',
                             'building in', 'office in', 'head office', 'head offices']
@@ -647,6 +647,7 @@ def proximity_pmi_rel_word(e1_type, e2_type, queue, index, results, rel_words_un
                             if any(x in rel_words_unigrams for x in unigrams_rel_words):
                                 hits_with_r += 1
                                 continue
+
                             if any(x in rel_words_bigrams for x in bigrams_rel_words):
                                 hits_with_r += 1
                                 continue
