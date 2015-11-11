@@ -31,6 +31,9 @@ q_limit = 50000
 founder_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofounded', 'founded', 'founders']
 founder_bigrams = ['started by']
 
+founder2_unigrams = ['founder', 'co-founder', 'cofounder', 'co-founded', 'cofounded', 'founded', 'founders']
+founder2_bigrams = ['started by']
+
 owns_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
 owns_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 'owned by']
 
@@ -200,7 +203,7 @@ def process_output(data, threshold, rel_type):
             if 'aft' not in locals():
                 aft = ''
 
-            if passive_voice is True and rel_type not in ['owns2']:
+            if passive_voice is True and rel_type not in ['owns2', 'founder2']:
                 r = ExtractedFact(e2, e1, float(score), bef, bet, aft, sentence, passive_voice)
 
             else:
