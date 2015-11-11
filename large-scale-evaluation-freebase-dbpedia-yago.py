@@ -34,6 +34,9 @@ founder_bigrams = ['started by']
 owns_unigrams = ['owns', 'acquired', 'bought', 'acquisition']
 owns_bigrams = ['has acquired', 'which acquired', 'was acquired', 'which owns', 'owned by']
 
+owns2_unigrams = ['parent']
+owns2_bigrams = ['unit of', 'subsidiary of', 'owned by']
+
 
 ######## INSTALLATIONS ########
 
@@ -55,11 +58,11 @@ affiliation_bigrams = ['chief executive', 'technical chief', 'top executive', 'n
 ######## STUDIED ########
 
 studied_unigrams = ['graduated', 'graduate']
-studied_bigrams = ['graduated from', 'earned phd', 'studies at', 'studied at', 'student at', 'graduated the']
+studied_bigrams = ['graduated from', 'earned phd', 'studied at', 'student at', 'graduated the']
 studied_trigrams = ['studied music at', 'studied briefly at', 'graduated from the']
 studied_quadrams = [', who graduated from', ', who enrolled at', 'is a graduate of']
-studied_pentgrams = ['who graduated from the prestigious']
 
+studied2_unigrams = ['graduate', 'phd', 'doctorate', 'master', 'mba']
 
 ######## LOCATED-IN ########
 
@@ -197,17 +200,11 @@ def process_output(data, threshold, rel_type):
             if 'aft' not in locals():
                 aft = ''
 
-            #if passive_voice is True and rel_type in ['acquired', 'installations-in']:
-            if passive_voice is True:
+            if passive_voice is True and rel_type not in ['owns2']:
                 r = ExtractedFact(e2, e1, float(score), bef, bet, aft, sentence, passive_voice)
 
             else:
                 r = ExtractedFact(e1, e2, float(score), bef, bet, aft, sentence, passive_voice)
-
-            """
-            if ("'s parent" in bet or 'subsidiary of' in bet or bet == 'subsidiary') and rel_type == 'acquired':
-                r = ExtractedFact(e2, e1, float(score), bef, bet, aft, sentence, passive_voice)
-            """
 
             system_output.append(r)
 
@@ -954,8 +951,8 @@ def main():
     elif rel_type == 'studied2':
         e1_type = "ORG"
         e2_type = "PER"
-        rel_words_unigrams = studied_unigrams
-        rel_words_bigrams = studied_bigrams
+        rel_words_unigrams = studied2_unigrams
+        rel_words_bigrams = None
         freebase_ground_truth = []
         dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
         yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
