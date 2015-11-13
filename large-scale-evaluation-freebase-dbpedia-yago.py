@@ -203,9 +203,8 @@ def process_output(data, threshold, rel_type):
             if 'aft' not in locals():
                 aft = ''
 
-            if passive_voice is True and rel_type not in ['owns2', 'founder2']:
+            if passive_voice is True and rel_type not in ['owns2', 'founder']:
                 r = ExtractedFact(e2, e1, float(score), bef, bet, aft, sentence, passive_voice)
-
             else:
                 r = ExtractedFact(e1, e2, float(score), bef, bet, aft, sentence, passive_voice)
 
