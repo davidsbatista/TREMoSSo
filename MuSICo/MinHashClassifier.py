@@ -78,6 +78,7 @@ def process_training_data(data_file):
         rel_id = int(rel_id.split(":")[1])
         start_time = time.time()
         shingles = fe.process_index(sentence, e1, e2)
+
         shingles = shingles.getvalue().strip().split(' ')
         sigs = MinHash.signature(shingles, N_SIGS)
         lsh.index(rel_type, rel_id, sigs)
