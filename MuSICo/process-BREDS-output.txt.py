@@ -33,7 +33,7 @@ def main():
             if line == '\n':
 
                 # extract features and calculate min-hash sigs
-                if passive_voice is True:
+                if passive_voice is True and rel_type not in ['owns2', 'founder']:
                     print "id:"+str(rel_id), '\t', rel_type, '\t', e2, '\t', e1, '\t', sentence
                 elif passive_voice is False:
                     print "id:"+str(rel_id), '\t', rel_type, '\t', e1, '\t', e2, '\t', sentence

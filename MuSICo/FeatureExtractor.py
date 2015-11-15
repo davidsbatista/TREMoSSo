@@ -120,7 +120,7 @@ class FeatureExtractor:
 
         for e1_b in e1_info[1]:
             for e2_b in e2_info[1]:
-                distance = e2_b - e1_b
+                distance = abs(e2_b - e1_b)
                 if distance > MAX_TOKENS or distance < MIN_TOKENS:
                     continue
                 else:

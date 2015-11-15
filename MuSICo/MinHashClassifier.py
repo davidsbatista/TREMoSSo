@@ -79,7 +79,12 @@ def process_training_data(data_file):
         start_time = time.time()
         shingles = fe.process_index(sentence, e1, e2)
 
-        shingles = shingles.getvalue().strip().split(' ')
+        try:
+            shingles = shingles.getvalue().strip().split(' ')
+        except AttributeError, e:
+            print line
+            print shingles
+            sys.exit(-1)
         sigs = MinHash.signature(shingles, N_SIGS)
         lsh.index(rel_type, rel_id, sigs)
         elapsed_time += time.time() - start_time
