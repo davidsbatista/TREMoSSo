@@ -65,7 +65,8 @@ studied_bigrams = ['graduated from', 'earned phd', 'studied at', 'student at', '
 studied_trigrams = ['studied music at', 'studied briefly at', 'graduated from the']
 studied_quadrams = [', who graduated from', ', who enrolled at', 'is a graduate of']
 
-studied2_unigrams = ['graduate', 'phd', 'doctorate', 'master', 'mba']
+studied2_unigrams = ['graduate', 'phd', 'doctorate', 'master', 'mba', 'studied', 'student']
+studied2_bigrams = ['graduate', 'phd', 'doctorate', 'master', 'mba', 'studied', 'student']
 
 ######## LOCATED-IN ########
 
@@ -387,6 +388,10 @@ def calculate_b_parallel(output, database):
 
 def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigrams, rel_words_bigrams):
 
+    print rel_words_unigrams
+    print rel_words_bigrams
+    print
+
     # contains the database facts described in the corpus but not extracted by the system
     #
     # G' = superset of G, cartesian product of all possible entities and relations (i.e., G' = E x R x E)
@@ -495,6 +500,7 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
             for e in no_match:
                 g_minus_d.add(e)
 
+        """
         print "Extra filtering: from the intersection of G' with D, select only those based on keywords"
         print "G intersection with D", len(g_intersect_d)
         filtered = set()
@@ -504,19 +510,30 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
             unigrams_bef = r.before
             unigrams_aft = r.after
             bigrams_bet = extract_bigrams(' '.join(r.between))
-            if any(x in rel_words_unigrams for x in unigrams_bet):
-                filtered.add(r)
-                continue
-            if any(x in rel_words_unigrams for x in unigrams_bef):
-                filtered.add(r)
-                continue
-            if any(x in rel_words_unigrams for x in unigrams_aft):
-                filtered.add(r)
-                continue
-            elif any(x in rel_words_bigrams for x in bigrams_bet):
-                filtered.add(r)
-                continue
+            try:
+                if any(x in rel_words_unigrams for x in unigrams_bet):
+                    filtered.add(r)
+                    continue
+                if any(x in rel_words_unigrams for x in unigrams_bef):
+                    filtered.add(r)
+                    continue
+                if any(x in rel_words_unigrams for x in unigrams_aft):
+                    filtered.add(r)
+                    continue
+                elif any(x in rel_words_bigrams for x in bigrams_bet):
+                    filtered.add(r)
+                    continue
+            except Exception, e:
+                print r.between
+                print r.before
+                print r.after
+                print r.sentence
+                print "rel_words_bigrams", rel_words_bigrams
+                print "rel_words_unigrams", rel_words_unigrams
+                sys.exit(-1)
+
         g_intersect_d = filtered
+        """
         print len(g_intersect_d), "relationships in the corpus which are in the KB"
         if len(g_intersect_d) > 0:
             # dump G intersected with D to file
@@ -954,7 +971,7 @@ def main():
         e1_type = "ORG"
         e2_type = "PER"
         rel_words_unigrams = studied2_unigrams
-        rel_words_bigrams = None
+        rel_words_bigrams = studied2_bigrams
         freebase_ground_truth = []
         dbpedia_ground_truth = [base_dir+"dbpedia_almaMater.txt"]
         yago_ground_truth = [base_dir+"yago_graduatedFrom.txt"]
