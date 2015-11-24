@@ -53,9 +53,9 @@ installations_in_bigrams = [', based in', 'based in', 'located in', 'main office
 
 ######## AFFILIATION ########
 
-affiliation_unigrams = ['chief', 'chairman', 'professor', 'executive', 'biologist', 'ceo', 'CEO', 'employer',
+affiliation_unigrams = ['chief', 'chairman', 'executive', 'ceo', 'CEO', 'employer',
                         'president', 'head', 'administrator', 'governor']
-affiliation_bigrams = ['chief executive', 'technical chief', 'top executive', 'nuclear chief']
+affiliation_bigrams = ['chief executive', 'technical chief', 'top executive']
 
 
 ######## STUDIED ########
