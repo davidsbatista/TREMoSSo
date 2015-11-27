@@ -1092,43 +1092,25 @@ def main():
     # Write relationships not found in the Database nor with high PMI relatation words to disk
     f = open(rel_type + "_negative.txt", "w")
     for r in sorted(set(not_found), reverse=True):
-        if r.passive_voice is True:
-            f.write('instance : ' + r.e2 + '\t' + r.e1 + '\t' + str(r.score) + '\n')
-            f.write('sentence : ' + r.sentence + '\n')
-            f.write('bef_words: ' + r.bef_words + '\n')
-            f.write('bet_words: ' + r.bet_words + '\n')
-            f.write('aft_words: ' + r.aft_words + '\n')
-            f.write('passive voice: ' + str(r.passive_voice) + '\n')
-            f.write('\n')
-        else:
-            f.write('instance : ' + r.e1 + '\t' + r.e2 + '\t' + str(r.score) + '\n')
-            f.write('sentence : ' + r.sentence + '\n')
-            f.write('bef_words: ' + r.bef_words + '\n')
-            f.write('bet_words: ' + r.bet_words + '\n')
-            f.write('aft_words: ' + r.aft_words + '\n')
-            f.write('passive voice: ' + str(r.passive_voice) + '\n')
-            f.write('\n')
+        f.write('instance : ' + r.e1 + '\t' + r.e2 + '\t' + str(r.score) + '\n')
+        f.write('sentence : ' + r.sentence + '\n')
+        f.write('bef_words: ' + r.bef_words + '\n')
+        f.write('bet_words: ' + r.bet_words + '\n')
+        f.write('aft_words: ' + r.aft_words + '\n')
+        f.write('passive voice: ' + str(r.passive_voice) + '\n')
+        f.write('\n')
     f.close()
 
     # Write all correct relationships (sentence, entities and score) to file
     f = open(rel_type + "_positive.txt", "w")
     for r in sorted(set(a).union(b), reverse=True):
-        if r.passive_voice is True:
-            f.write('instance : ' + r.e2 + '\t' + r.e1 + '\t' + str(r.score) + '\n')
-            f.write('sentence : ' + r.sentence + '\n')
-            f.write('bef_words: ' + r.bef_words + '\n')
-            f.write('bet_words: ' + r.bet_words + '\n')
-            f.write('aft_words: ' + r.aft_words + '\n')
-            f.write('passive voice: ' + str(r.passive_voice) + '\n')
-            f.write('\n')
-        else:
-            f.write('instance : ' + r.e1 + '\t' + r.e2 + '\t' + str(r.score) + '\n')
-            f.write('sentence : ' + r.sentence + '\n')
-            f.write('bef_words: ' + r.bef_words + '\n')
-            f.write('bet_words: ' + r.bet_words + '\n')
-            f.write('aft_words: ' + r.aft_words + '\n')
-            f.write('passive voice: ' + str(r.passive_voice) + '\n')
-            f.write('\n')
+        f.write('instance : ' + r.e1 + '\t' + r.e2 + '\t' + str(r.score) + '\n')
+        f.write('sentence : ' + r.sentence + '\n')
+        f.write('bef_words: ' + r.bef_words + '\n')
+        f.write('bet_words: ' + r.bet_words + '\n')
+        f.write('aft_words: ' + r.aft_words + '\n')
+        f.write('passive voice: ' + str(r.passive_voice) + '\n')
+        f.write('\n')
     f.close()
 
     a = set(a)
