@@ -4,11 +4,13 @@
 __author__ = "David S. Batista"
 __email__ = "dsbatista@inesc-id.pt"
 
+import multiprocessing
 import os
 import sys
 import time
 import codecs
 import MinHash
+import Queue
 
 from FeatureExtractor import FeatureExtractor
 from LocalitySensitiveHashing import LocalitySensitiveHashing
@@ -23,18 +25,65 @@ MIN_TOKENS = 1
 
 
 def classify_sentences(data_file, lsh):
-    #TODO: isto também pode ser paralelizado
-    fe = FeatureExtractor()
+    manager = multiprocessing.Manager()
+    queue = manager.Queue()
+    print "\nLoading sentences from file"
     f_sentences = codecs.open(data_file, encoding='utf-8')
-    f_output = open("results.txt", "wb")
     count = 0
-    elapsed_time = 0
     for line in f_sentences:
-        if line.startswith("#"):
+        if line.startswith("#") or line.startswith("\n"):
             continue
-        else:
-            start_time = time.time()
-            # extract features
+        count += 1
+        if count % 5000 == 0:
+            sys.stdout.write(".")
+        queue.put(line.strip())
+    f_sentences.close()
+
+    print queue.qsize(), "sentences loaded"
+
+    relationships = []
+    num_cpus = 12
+    pipes = [multiprocessing.Pipe(False) for _ in range(num_cpus)]
+    processes = [multiprocessing.Process(target=classify, args=(queue, lsh, pipes[i][1])) for i in range(num_cpus)]
+
+    print "\nClassifying relationship from sentences"
+    print "Running", len(processes), "processes"
+    start_time = time.time()
+    for proc in processes:
+        proc.start()
+
+    for i in range(len(pipes)):
+        data = pipes[i][0].recv()
+        child_instances = data
+        for x in child_instances:
+            relationships.append(x)
+        pipes[i][0].close()
+
+    for proc in processes:
+        proc.join()
+
+    elapsed_time = time.time() - start_time
+    sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time+"\n")
+
+    f_output = open("classified_sentences.txt", "w")
+    for rel in relationships:
+        f_output.write("instance: " + rel[0]+"\t"+rel[1]+'\n')
+        f_output.write("sentence: " + rel[2].encode("utf8")+"\n")
+        f_output.write("rel_type: " + rel[3].encode("utf8")+'\n\n')
+    f_output.close()
+
+
+def classify(queue, lsh, child_conn):
+    fe = FeatureExtractor()
+    count = 0
+    classified_relationships = []
+    while True:
+        try:
+            line = queue.get_nowait()
+            count += 1
+            if count % 1000 == 0:
+                print count, " processed, remaining ", queue.qsize()
+
             relationships = fe.process_classify(line)
             for r in relationships:
                 rel = r[0]
@@ -43,66 +92,107 @@ def classify_sentences(data_file, lsh):
                 sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
                 # find closest neighbours
                 types = lsh.classify(sigs)
-                elapsed_time += time.time() - start_time
                 if types is not None:
-                    f_output.write("instance: " + rel.e1+"\t"+rel.e2+'\n')
-                    f_output.write("sentence: " + rel.sentence.encode("utf8")+"\n")
-                    f_output.write("rel_type: " + types.encode("utf8")+'\n\n')
+                    classified_r = (rel.e1, rel.e2, rel.sentence, types.encode("utf8"))
+                else:
+                    classified_r = (rel.e1, rel.e2, rel.sentence, "None")
+                classified_relationships.append(classified_r)
 
-        count += 1
-        if count % 100 == 0:
-            sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time+"\n")
-            f_output.flush()
-
-    f_output.close()
-    f_sentences.close()
+        except Queue.Empty:
+            print multiprocessing.current_process(), "Queue is Empty"
+            child_conn.send(classified_relationships)
+            break
 
 
 def process_training_data(data_file):
-    #TODO: parallelize
     print "Extracting features from training data and indexing in LSH\n"
     print "MinHash Signatures : ", N_SIGS
     print "Bands              : ", N_BANDS
     print
-    relationships = []
-    f_sentences = codecs.open(data_file, encoding='utf-8')
     lsh = LocalitySensitiveHashing(N_BANDS, N_SIGS, KNN)
     lsh.create()
-    fe = FeatureExtractor()
+
+    # parallelization
+    # read file into a queue
+    # each process runs a FeatureExtractior
+    manager = multiprocessing.Manager()
+    queue = manager.Queue()
+    print "\nLoading sentences from file"
+    f_sentences = codecs.open(data_file, encoding='utf-8')
     count = 0
-    elapsed_time = 0
     for line in f_sentences:
-        if line == '\n':
+        if line.startswith("#") or line.startswith("\n"):
             continue
-        rel_id, rel_type, e1, e2, sentence = line.split('\t')
-        rel_id = int(rel_id.split(":")[1])
-        start_time = time.time()
-        shingles = fe.process_index(sentence, e1, e2)
-
-        try:
-            shingles = shingles.getvalue().strip().split(' ')
-        except AttributeError, e:
-            print line
-            print shingles
-            sys.exit(-1)
-        sigs = MinHash.signature(shingles, N_SIGS)
-        lsh.index(rel_type, rel_id, sigs)
-        elapsed_time += time.time() - start_time
-        relationships.append((rel_type, rel_id, sigs, shingles))
         count += 1
-        if count % 100 == 0:
-            sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time+"\n")
-
-    sys.stdout.write("Total processing time" + " in %.2f seconds" % elapsed_time+"\n")
+        if count % 10000 == 0:
+            sys.stdout.write(".")
+        queue.put(line.strip())
     f_sentences.close()
-    f_features = open('features.txt', 'w')
+    print queue.qsize(), "sentences loaded"
+
+    num_cpus = 12
+    relationships = []
+    pipes = [multiprocessing.Pipe(False) for _ in range(num_cpus)]
+    processes = [multiprocessing.Process(target=extract_features, args=(queue, lsh, pipes[i][1])) for i in range(num_cpus)]
+
+    print "\nIndexing relationship instances from sentences"
+    print "Running", len(processes), " processes"
+    start_time = time.time()
+    for proc in processes:
+        proc.start()
+
+    for i in range(len(pipes)):
+        data = pipes[i][0].recv()
+        child_instances = data
+        for x in child_instances:
+            relationships.append(x)
+        pipes[i][0].close()
+
+    for proc in processes:
+        proc.join()
+
+    elapsed_time = time.time() - start_time
+    sys.stdout.write("Processed " + str(count) + " in %.2f seconds" % elapsed_time+"\n")
 
     # write shingles to file
+    f_features = open("features.txt", "w")
     for rel in relationships:
         f_features.write(str(rel[1])+'\t'+rel[0].decode("utf8")+'\t'+' '.join(rel[3])+'\n')
     f_features.close()
 
     return relationships
+
+
+def extract_features(queue, lsh, child_conn):
+    fe = FeatureExtractor()
+    relationships = []
+    count = 0
+    while True:
+        try:
+            line = queue.get_nowait()
+            count += 1
+            if count % 100 == 0:
+                print count, " processed, remaining ", queue.qsize()
+
+            rel_id, rel_type, e1, e2, sentence = line.split('\t')
+            rel_id = int(rel_id.split(":")[1])
+            shingles = fe.process_index(sentence, e1, e2)
+
+            try:
+                shingles = shingles.getvalue().strip().split(' ')
+            except AttributeError, e:
+                print line
+                print shingles
+                sys.exit(-1)
+
+            sigs = MinHash.signature(shingles, N_SIGS)
+            lsh.index(rel_type, rel_id, sigs)
+            relationships.append((rel_type, rel_id, sigs, shingles))
+
+        except Queue.Empty:
+            print multiprocessing.current_process(), "Queue is Empty"
+            child_conn.send(relationships)
+            break
 
 
 def index_shingles(shingles_file):
