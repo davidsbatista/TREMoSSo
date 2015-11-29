@@ -500,7 +500,6 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
             for e in no_match:
                 g_minus_d.add(e)
 
-        """
         print "Extra filtering: from the intersection of G' with D, select only those based on keywords"
         print "G intersection with D", len(g_intersect_d)
         filtered = set()
@@ -533,7 +532,7 @@ def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigr
                 sys.exit(-1)
 
         g_intersect_d = filtered
-        """
+
         print len(g_intersect_d), "relationships in the corpus which are in the KB"
         if len(g_intersect_d) > 0:
             # dump G intersected with D to file
