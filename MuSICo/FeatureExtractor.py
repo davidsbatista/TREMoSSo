@@ -60,8 +60,13 @@ class FeatureExtractor:
                 if token[1] == "VBG":
                     shingles.write(token[0].encode("utf8").strip() + '_VBG_' + context_tag + ' ')
 
-    def extract_features(self, after, before, between):
+    def extract_features(self, after, before, between, e1_type, e2_type):
         shingles = StringIO.StringIO()
+
+        # add entities type
+        shingles.write(e1_type.encode("utf8").strip() + '_ENTITY1 ')
+        shingles.write(e2_type.encode("utf8").strip() + '_ENTITY2 ')
+
         # relational patterns corresponding to: a verb, followed by nouns, adjectives, or adverbs,
         # and ending with a preposition;
         reverb_pattern = self.reverb.extract_reverb_patterns_tagged_ptb(between)
@@ -115,6 +120,12 @@ class FeatureExtractor:
         text_tagged = self.tagger.tag(text_tokens)
         assert len(text_tagged) == len(text_tokens)
 
+        # extract entities types
+        e1_type = re.search(r'<[A-Z]+>'+e1+'</[A-Z]+>', sentence).group(0)
+        e2_type = re.search(r'<[A-Z]+>'+e2+'</[A-Z]+>', sentence).group(0)
+        e1_type = e1_type[1:4]
+        e2_type = e2_type[1:4]
+
         e1_info = find_locations(e1, text_tokens)
         e2_info = find_locations(e2, text_tokens)
 
@@ -130,7 +141,7 @@ class FeatureExtractor:
                     after = text_tagged[e2_b+len(e2_info[0]):]
                     after = after[:CONTEXT_WINDOW]
 
-                    return self.extract_features(after, before, between)
+                    return self.extract_features(after, before, between, e1_type, e2_type)
 
     def process_classify(self, line):
         sentence_no_tags = re.sub(regex_clean_simple, "", line)
