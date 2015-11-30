@@ -151,9 +151,11 @@ class FeatureExtractor:
 
         sentence = Sentence(line.strip(), MAX_TOKENS,  MIN_TOKENS, CONTEXT_WINDOW, self.tagger)
         relationships = []
+
         for rel in sentence.relationships:
-            shingles = self.extract_features(rel.after, rel.before, rel.between)
+            shingles = self.extract_features(rel.after, rel.before, rel.between, rel.e1_type, rel.e2_type)
             relationships.append((rel, shingles))
+
         return relationships
 
     @staticmethod
