@@ -15,7 +15,7 @@ import Queue
 from FeatureExtractor import FeatureExtractor
 from LocalitySensitiveHashing import LocalitySensitiveHashing
 
-N_BANDS = 50
+N_BANDS = 200
 N_SIGS = 600
 KNN = 7
 CONTEXT_WINDOW = 3
@@ -88,8 +88,10 @@ def classify(queue, lsh, child_conn):
             for r in relationships:
                 rel = r[0]
                 shingles = r[1]
+
                 # compute signatures
                 sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
+
                 # find closest neighbours
                 types = lsh.classify(sigs)
                 if types is not None:
@@ -208,11 +210,6 @@ def index_shingles(shingles_file):
         shingles = shingles.strip().split(' ')
         relationships.append((rel_type, rel_id, shingles))
     f_shingles.close()
-
-    print "Indexing ", len(relationships), "relationships"
-    print "MinHash Signatures : ", N_SIGS
-    print "Bands              : ", N_BANDS
-    print
 
     lsh = LocalitySensitiveHashing(N_BANDS, N_SIGS, KNN)
     lsh.create()

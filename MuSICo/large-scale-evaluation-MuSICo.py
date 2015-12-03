@@ -369,10 +369,6 @@ def calculate_b_parallel(output, database):
 
 def calculate_c(corpus, database, b, e1_type, e2_type, rel_type, rel_words_unigrams, rel_words_bigrams):
 
-    print rel_words_unigrams
-    print rel_words_bigrams
-    print
-
     # contains the database facts described in the corpus but not extracted by the system
     #
     # G' = superset of G, cartesian product of all possible entities and relations (i.e., G' = E x R x E)
@@ -1042,10 +1038,22 @@ def main():
     for r in c:
         uniq_c.add((r.e1, r.e2))
 
+    """
+    for r in c:
+        print r.e1_type+":"+r.e1+'\t'+r.e2_type+":"+r.e2
+        print r.sentence
+        print
+    """
+
     # By applying the PMI of the facts not in the database (i.e., G' \in D)
     # we determine |G \ D|, then we can estimate |d| = |G \ D| - |a|
     print "\nCalculating set D: facts described in the corpus not in the system output nor in the database"
     d = calculate_d(g_minus_d, a, e1_type, e2_type, index, rel_type, rel_words_unigrams, rel_words_bigrams)
+
+    for r in d:
+        print r.e1_type+":"+r.e1+'\t'+r.e2_type+":"+r.e2
+        print r.sentence
+        print
 
     print "System output      :", len(system_output)
     print "Found in database  :", len(b)
