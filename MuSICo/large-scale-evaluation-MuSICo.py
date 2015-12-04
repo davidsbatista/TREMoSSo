@@ -168,16 +168,16 @@ def process_output(data):
     each relationship is transformed into a ExtracteFact class
     """
     system_output = list()
+    count = 0
     for line in fileinput.input(data):
-
+        if count % 10000 == 0:
+            sys.stdout.write(".")
         if line.startswith('instance'):
             e1, e2 = line.split("instance:")[1].strip().split('\t')
-
         if line.startswith('sentence'):
             sentence = line.split("sentence: ")[1]
-
             sentence_no_tags = re.sub(regex_clean_simple, "", sentence)
-            text_tokens = word_tokenize(sentence_no_tags)
+            text_tokens = word_tokenize(sentence_no_tags.decode("utf8"))
             e1_info = find_locations(e1, text_tokens)
             e2_info = find_locations(e2, text_tokens)
             for e1_b in e1_info[1]:
@@ -191,6 +191,7 @@ def process_output(data):
 
                     r = ExtractedFact(e1, e2, bet_words, sentence)
                     system_output.append(r)
+                    count += 1
 
     fileinput.close()
     return system_output
@@ -829,6 +830,7 @@ def main():
     num_cpus = int(sys.argv[3])
 
     # load relationships extracted by the system
+    print "Reading relationships"
     system_output = process_output(sys.argv[1])
     print "System output relationships   :", len(system_output)
 
