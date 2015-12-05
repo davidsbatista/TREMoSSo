@@ -15,7 +15,7 @@ import Queue
 from FeatureExtractor import FeatureExtractor
 from LocalitySensitiveHashing import LocalitySensitiveHashing
 
-N_BANDS = 200
+N_BANDS = 100
 N_SIGS = 600
 KNN = 7
 CONTEXT_WINDOW = 3
