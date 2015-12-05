@@ -169,31 +169,34 @@ def process_output(data):
     """
     system_output = list()
     count = 0
-    for line in fileinput.input(data):
-        if count % 10000 == 0:
-            sys.stdout.write(".")
-        if line.startswith('instance'):
-            e1, e2 = line.split("instance:")[1].strip().split('\t')
-        if line.startswith('sentence'):
-            sentence = line.split("sentence: ")[1]
-            sentence_no_tags = re.sub(regex_clean_simple, "", sentence)
-            text_tokens = word_tokenize(sentence_no_tags.decode("utf8"))
-            e1_info = find_locations(e1, text_tokens)
-            e2_info = find_locations(e2, text_tokens)
-            for e1_b in e1_info[1]:
-                for e2_b in e2_info[1]:
-                    distance = abs(e2_b - e1_b)
-                    if distance > MAX_TOKENS_AWAY or distance < MIN_TOKENS_AWAY:
-                        continue
-                    else:
-                        bet = text_tokens[e1_b+len(word_tokenize(e1)):e2_b]
-                        bet_words = ' '.join(bet)
+    with codecs.open(data, encoding="utf-8") as f_data:
+        for line in f_data:
 
-                    r = ExtractedFact(e1, e2, bet_words, sentence)
-                    system_output.append(r)
-                    count += 1
+            if count % 10000 == 0:
+                sys.stdout.write(".")
 
-    fileinput.close()
+            if line.startswith('instance'):
+                e1, e2 = line.split("instance:")[1].strip().split('\t')
+
+            if line.startswith('sentence'):
+                sentence = line.split("sentence: ")[1]
+                sentence_no_tags = re.sub(regex_clean_simple, "", sentence)
+                text_tokens = word_tokenize(sentence_no_tags)
+                e1_info = find_locations(e1, text_tokens)
+                e2_info = find_locations(e2, text_tokens)
+                for e1_b in e1_info[1]:
+                    for e2_b in e2_info[1]:
+                        distance = abs(e2_b - e1_b)
+                        if distance > MAX_TOKENS_AWAY or distance < MIN_TOKENS_AWAY:
+                            continue
+                        else:
+                            bet = text_tokens[e1_b+len(word_tokenize(e1)):e2_b]
+                            bet_words = ' '.join(bet)
+
+                        r = ExtractedFact(e1, e2, bet_words, sentence)
+                        system_output.append(r)
+                        count += 1
+
     return system_output
 
 
@@ -1040,22 +1043,10 @@ def main():
     for r in c:
         uniq_c.add((r.e1, r.e2))
 
-    """
-    for r in c:
-        print r.e1_type+":"+r.e1+'\t'+r.e2_type+":"+r.e2
-        print r.sentence
-        print
-    """
-
     # By applying the PMI of the facts not in the database (i.e., G' \in D)
     # we determine |G \ D|, then we can estimate |d| = |G \ D| - |a|
     print "\nCalculating set D: facts described in the corpus not in the system output nor in the database"
     d = calculate_d(g_minus_d, a, e1_type, e2_type, index, rel_type, rel_words_unigrams, rel_words_bigrams)
-
-    for r in d:
-        print r.e1_type+":"+r.e1+'\t'+r.e2_type+":"+r.e2
-        print r.sentence
-        print
 
     print "System output      :", len(system_output)
     print "Found in database  :", len(b)
@@ -1076,15 +1067,6 @@ def main():
     print "|S| =", len(system_output)
     print "|G| =", len(set(a).union(set(b).union(set(c).union(set(d)))))
     print "Relationships not found:", len(set(not_found))
-
-    # Write relationships not found in the Database nor with high PMI relatation words to disk
-    f = open(rel_type + "_wrong.txt", "w")
-    for r in sorted(set(not_found), reverse=True):
-        f.write('instance : ' + r.e1 + '\t' + r.e2 + '\n')
-        f.write('sentence : ' + r.sentence + '\n')
-        f.write('bet_words: ' + r.bet_words + '\n')
-        f.write('\n')
-    f.close()
 
     a = set(a)
     b = set(b)
@@ -1107,6 +1089,15 @@ def main():
         print "Recall      : ", recall
         print "F1          : ", f1
         print "\n"
+
+    # Write relationships not found in the Database nor with high PMI relatation words to disk
+    f = open(rel_type + "_wrong.txt", "w")
+    for r in sorted(set(not_found), reverse=True):
+        f.write('instance : ' + r.e1 + '\t' + r.e2 + '\n')
+        f.write('sentence : ' + r.sentence.encode("utf8") + '\n')
+        f.write('bet_words: ' + r.bet_words.encode("utf8") + '\n')
+        f.write('\n')
+    f.close()
 
 if __name__ == "__main__":
     main()
