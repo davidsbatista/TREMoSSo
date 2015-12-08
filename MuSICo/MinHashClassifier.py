@@ -93,7 +93,7 @@ def classify2(queue, n_sigs, lsh, child_conn):
         try:
             r = queue.get_nowait()
             count += 1
-            if count % 10 == 0:
+            if count % 1000 == 0:
                 print multiprocessing.current_process(), count, " processed, remaining ", queue.qsize()
 
             e1 = r[0]
@@ -280,7 +280,7 @@ def extract_features(queue, lsh, child_conn, n_sigs):
         try:
             line = queue.get_nowait()
             count += 1
-            if count % 100 == 0:
+            if count % 1000 == 0:
                 print count, " processed, remaining ", queue.qsize()
 
             rel_id, rel_type, e1, e2, sentence = line.split('\t')

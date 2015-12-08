@@ -28,4 +28,9 @@ def min_hash(shingles, function_id):
 
 
 def hash_function(shingle, function_id):
-    return xxhash.xxh32(shingle * function_id).intdigest()
+    try:
+        return xxhash.xxh32(shingle.encode("utf8") * function_id).intdigest()
+    except Exception, e:
+        print e
+        print shingle
+        sys.exit(-1)
