@@ -164,10 +164,10 @@ def classify_sentences(data_file, lsh):
 
     f_output = open("set_b_shingles.txt", "w")
     for r in relationships:
-        f_output.write("e1: "+r[0].e1+'\n')
-        f_output.write("e2: "+r[0].e2+'\n')
-        f_output.write("sentence: "+r[0].sentence+'\n')
-        f_output.write("shingles: "+r[1].getvalue()+'\n\n')
+        f_output.write("e1: "+r[0].e1.encode("utf8")+'\n')
+        f_output.write("e2: "+r[0].e2.encode("utf8")+'\n')
+        f_output.write("sentence: "+r[0].sentence.encode("utf8")+'\n')
+        f_output.write("shingles: "+r[1].getvalue().encode("utf8")+'\n\n')
 
     """
     f_output = open("classified_sentences.txt", "w")
@@ -192,11 +192,12 @@ def classify(queue, lsh, child_conn):
                 print multiprocessing.current_process(), count, " processed, remaining ", queue.qsize()
 
             relationships = fe.process_classify(line)
-            """
+
             for r in relationships:
                 rel = r[0]
                 shingles = r[1]
 
+                """
                 # compute signatures
                 sigs = MinHash.signature(shingles.getvalue().split(), N_SIGS)
 
@@ -207,12 +208,12 @@ def classify(queue, lsh, child_conn):
                 else:
                     classified_r = (rel.e1, rel.e2, rel.sentence, "None")
                 classified_relationships.append(classified_r)
-            """
+                """
+                classified_relationships.append((rel, shingles))
 
         except Queue.Empty:
             print multiprocessing.current_process(), "Queue is Empty"
-            #child_conn.send(classified_relationships)
-            child_conn.send(relationships)
+            child_conn.send(classified_relationships)
             break
 
 
