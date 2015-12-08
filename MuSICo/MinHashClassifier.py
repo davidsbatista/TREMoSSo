@@ -167,7 +167,7 @@ def classify_sentences(data_file, lsh):
         f_output.write("e1: "+r[0].e1.encode("utf8")+'\n')
         f_output.write("e2: "+r[0].e2.encode("utf8")+'\n')
         f_output.write("sentence: "+r[0].sentence.encode("utf8")+'\n')
-        f_output.write("shingles: "+r[1].getvalue().encode("utf8")+'\n\n')
+        f_output.write("shingles: "+r[1].getvalue()+'\n\n')
 
     """
     f_output = open("classified_sentences.txt", "w")
