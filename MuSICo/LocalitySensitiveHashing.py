@@ -22,7 +22,7 @@ class LocalitySensitiveHashing:
     bands = []
     minhash_instances = None
 
-    def __init__(self, n_bands, n_sigs, knn):
+    def __init__(self, n_bands, n_sigs):
         if (n_sigs % n_bands) != 0:
             print "Error! Number of hash signatures must be a multiple of number of bands"
             sys.exit(0)
@@ -30,7 +30,6 @@ class LocalitySensitiveHashing:
             self.n_sigs = n_sigs
             self.n_bands = n_bands
             self.sigs_per_band = n_sigs / n_bands
-            self.kNN = knn
 
             for i in range(0, self.n_bands):
                 conn = redis.StrictRedis(host='localhost', port=6379, db=i)
