@@ -360,7 +360,7 @@ def main():
 
     elif sys.argv[1] == 'classify2':
         knn = int(sys.argv[5])
-        lsh = LocalitySensitiveHashing(n_bands, n_sigs)
+        lsh = LocalitySensitiveHashing(n_bands, n_sigs, knn)
         classify_sentences2(sys.argv[2], lsh, n_sigs)
 
     ############################
