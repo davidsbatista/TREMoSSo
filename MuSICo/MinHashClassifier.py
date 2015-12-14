@@ -304,7 +304,7 @@ def extract_features(queue, lsh, child_conn, n_sigs):
             break
 
 
-def index_shingles(shingles_file, n_bands, n_sigs):
+def index_shingles(shingles_file, n_bands, n_sigs, knn):
     """
     Parses already extracted shingles from a file.
     File format is: relaltionship_type \t shingle1 shingle2 shingle3 ... shingle_n
@@ -318,7 +318,10 @@ def index_shingles(shingles_file, n_bands, n_sigs):
         relationships.append((rel_type, rel_id, shingles))
     f_shingles.close()
 
-    lsh = LocalitySensitiveHashing(n_bands, n_sigs)
+    print "SIGS  :", n_sigs
+    print "BANDS :", n_bands
+
+    lsh = LocalitySensitiveHashing(n_bands, n_sigs, knn)
     lsh.create()
     count = 0
     elapsed_time = 0
@@ -343,9 +346,9 @@ def main():
     # argv[1] - classify
     # argv[2] - sentence to classify
 
-    #TODO: test if parameters are correct
     n_bands = int(sys.argv[3])
     n_sigs = int(sys.argv[4])
+    knn = int(sys.argv[5])
 
     if sys.argv[1] == 'classify':
         knn = int(sys.argv[5])
@@ -359,7 +362,6 @@ def main():
     # argv[2] - sentence to classify
 
     elif sys.argv[1] == 'classify2':
-        knn = int(sys.argv[5])
         lsh = LocalitySensitiveHashing(n_bands, n_sigs, knn)
         classify_sentences2(sys.argv[2], lsh, n_sigs)
 
@@ -372,7 +374,7 @@ def main():
     elif sys.argv[1] == 'index':
         # calculate min-hash sigs (from already extracted shingles) index in bands
         if os.path.isfile("features.txt"):
-            index_shingles('features.txt', n_bands, n_sigs)
+            index_shingles('features.txt', n_bands, n_sigs, knn)
 
         # load sentences, extract features, calculate min-hash sigs, index in bands
         else:
